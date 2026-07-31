@@ -1,6 +1,6 @@
 # Guia de Trabalho
 
-### 🗂️ Fase 1: Módulo de Configuração (Dev 1)
+### 🗂️ Fase 1: Módulo de Configuração (Dev 1) - Bassiro Nanque <bnanque>
 Estes são os "Models" do sistema. Eles guardam os dados estáticos lidos do arquivo .conf.
 
 1.  **ConfigParser.hpp**
@@ -17,7 +17,7 @@ Estes são os "Models" do sistema. Eles guardam os dados estáticos lidos do arq
     *   **O Contrato Principal:** Métodos como `bool isMethodAllowed(std::string method) const;`, `bool isAutoIndexOn() const;`, `std::string getRoot() const;`.
     *   *Quem usa:* O Dev 3 (HTTP), o tempo todo, para saber se tem permissão para realizar a ação pedida pelo cliente.
 
-### ⚙️ Fase 2: Módulo de Rede e Loop (Dev 2)
+### ⚙️ Fase 2: Módulo de Rede e Loop (Dev 2) - Gabriel Florio <gabriede>
 Estes são os "motores" do sistema. Eles gerenciam os descritores de arquivo e a comunicação bruta com o sistema operacional.
 
 4.  **ServerManager.hpp (ou Webserv.hpp)**
@@ -30,7 +30,7 @@ Estes são os "motores" do sistema. Eles gerenciam os descritores de arquivo e a
     *   **O Contrato Principal:** Métodos como `void appendRawData(const std::string& data);`, `std::string getRawData() const;` e métodos para checar se a conexão deve ser fechada.
     *   *Quem usa:* O próprio Dev 2 para gerenciar o estado daquele cliente específico dentro do `poll()`.
 
-### 🧠 Fase 3: Módulo HTTP e CGI (Dev 3)
+### 🧠 Fase 3: Módulo HTTP e CGI (Dev 3) - Maíra Kaminski <makamins>
 Estes são os "Controllers". Eles pegam dados brutos, aplicam a lógica de negócio e geram o resultado final.
 
 6.  **Request.hpp**
