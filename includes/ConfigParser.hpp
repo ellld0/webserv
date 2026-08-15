@@ -13,12 +13,12 @@ class ConfigParser
 		ConfigParser(const ConfigParser& other);
 		ConfigParser& operator=(const ConfigParser& other);
 		~ConfigParser();
-		ServerConfig parseConfigFile(const std::string& filename);
+		std::vector<ServerConfig> parseConfigFile(const std::string& filename);
 	private:
 		bool isValidPort(const std::string& portString);
 		bool isValidBodySize(const std::string& sizeString);
 		std::string preprocess(const std::string& line);
-		ServerConfig parseServer(const std::vector<std::string>& tokens);
+		ServerConfig parseServer(const std::vector<std::string>& tokens, size_t& i);
 		LocationConfig parseLocation(const std::vector<std::string>& tokens, size_t& i);
         void handleListen(ServerConfig& server, const std::vector<std::string>& tokens, size_t& i, bool& hasListen);
         void handleServerName(ServerConfig& server, const std::vector<std::string>& tokens, size_t& i, bool& hasServerName);

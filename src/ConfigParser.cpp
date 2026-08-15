@@ -120,12 +120,12 @@ ConfigParser::~ConfigParser()
         return location;
     }
     
-ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens)
+ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, size_t& i)
 {
-    if (tokens.size() < 3 || tokens[0] != "server" || tokens[1] != "{")
+    if (i + 1 >= tokens.size() || tokens[i] != "server" || tokens[i + 1] != "{")
         throw std::runtime_error("Error: invalid 'server' block format.");
     ServerConfig server;
-    size_t i = 2;
+    i += 2;
     bool blockClose = false;
     bool hasListen = false, hasServerName = false, hasMaxBody = false;
     while (i < tokens.size())
@@ -155,9 +155,6 @@ ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens)
     if (!blockClose)
         throw std::runtime_error("Error: server block is not closed with '}'.");
 
-    if (i < tokens.size())
-        throw std::runtime_error("Error: extra tokens after closing 'server' block.");
-
     return server;
 }
 
@@ -185,9 +182,10 @@ std::string ConfigParser::preprocess(const std::string& line)
     return result;
 }
 
-ServerConfig ConfigParser::parseConfigFile(const std::string& filename)
+std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filename)
 {
     std::vector<std::string> tokens;
+    std::vector<ServerConfig> servers;
     std::ifstream file(filename.c_str());
 
     if (!file.is_open())
@@ -212,6 +210,16 @@ ServerConfig ConfigParser::parseConfigFile(const std::string& filename)
 //        std::cout << "Token " << i << ": " << tokens[i] << std::endl;
 //    }
 
-    ServerConfig server = parseServer(tokens);
-    return server;
+    size_t i = 0;
+    while (i < tokens.size())
+    {
+        if (tokens[i] != "server")
+            throw std::runtime_error("Error: expected 'server' block.");
+        servers.push_back(parseServer(tokens, i));
+    }
+
+    if (servers.empty())
+        throw std::runtime_error("Error: configuration file must contain at least one 'server' block.");
+
+    return servers;
 }
