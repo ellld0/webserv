@@ -1,6 +1,8 @@
 #ifndef CGI_HANDLER_HPP
 # define CGI_HANDLER_HPP
+
 # include <string>
+# include <vector>
 
 class Request;
 class Response;

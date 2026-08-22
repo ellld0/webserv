@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-class Location {
+class LocationConfig {
 
 	private:
 		std::string path_;
@@ -16,7 +16,7 @@ class Location {
 		std::string index_;
 		std::string uploadPath_;
 	public:
-		Location();
+		LocationConfig();
 		void setPath(const std::string& path);
 		const std::string& getPath() const;
 		void setRoot(const std::string& root);

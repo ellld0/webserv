@@ -1,6 +1,10 @@
 #ifndef RESPONSE_HPP
 # define RESPONSE_HPP
 
+# include <string>
+# include <map>
+# include "ServerConfig.hpp"
+
 class Request;
 
 class Response
