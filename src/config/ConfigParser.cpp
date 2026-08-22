@@ -8,17 +8,28 @@
 #include <cctype>
 
 
-Parser::Parser()
+ConfigParser::ConfigParser()
 {
 
 }
 
-Parser::~Parser()
+ConfigParser::ConfigParser(const ConfigParser& other)
+{
+    (void)other;
+}
+
+ConfigParser& ConfigParser::operator=(const ConfigParser& other)
+{
+    (void)other;
+    return *this;
+}
+
+ConfigParser::~ConfigParser()
 {
 
 }
 
-    bool Parser::isValidPort(const std::string& portString)
+    bool ConfigParser::isValidPort(const std::string& portString)
     {
         if (portString.empty())
         {
@@ -40,7 +51,7 @@ Parser::~Parser()
         return true;
     }
 
-    bool Parser::isValidBodySize(const std::string& sizeString)
+    bool ConfigParser::isValidBodySize(const std::string& sizeString)
     {
         if (sizeString.empty())
         {
@@ -67,16 +78,16 @@ Parser::~Parser()
         return true;
     }
 
-    Location Parser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
+    LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
     {
        if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
-            throw std::runtime_error("Erro: sintaxe inválida no cabeçalho do bloco 'location'.");
-        Location location;
+            throw std::runtime_error("Error: invalid syntax in 'location' block header.");
+        LocationConfig location;
         location.setPath(tokens[i + 1]);
         i += 3;
         bool blockClose = false;
         bool hasRoot = false, hasMethod = false, hasDirListing = false;
-        bool hasIndex = false, hasUpload = false;
+        bool hasIndex = false, hasUpload = false, hasReturn = false;
         while (i < tokens.size())
         {
             const std::string& token = tokens[i];
@@ -88,7 +99,7 @@ Parser::~Parser()
             else if (token == "directory_listing")
                 parseDirListingDirective(location, tokens, i, hasDirListing);
             else if (token == "return")
-                parseReturnDirective(location, tokens, i);
+                parseReturnDirective(location, tokens, i, hasReturn);
             else if (token == "index")
                 parseIndexDirective(location, tokens, i, hasIndex);
             else if (token == "upload")
@@ -100,21 +111,21 @@ Parser::~Parser()
                 break;
             }
             else
-                throw std::runtime_error("Erro: diretiva desconhecida em 'location': " + token + ".");
+                throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
         }
 
         if (!blockClose)
-            throw std::runtime_error("Erro: bloco location não está fechado com '}'.");
+            throw std::runtime_error("Error: location block is not closed with '}'.");
 
         return location;
     }
     
-Server Parser::parseServer(const std::vector<std::string>& tokens)
+ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, size_t& i)
 {
-    if (tokens.size() < 3 || tokens[0] != "server" || tokens[1] != "{")
-        throw std::runtime_error("Erro: Formato de bloco 'server' inválido.");
-    Server server;
-    size_t i = 2;
+    if (i + 1 >= tokens.size() || tokens[i] != "server" || tokens[i + 1] != "{")
+        throw std::runtime_error("Error: invalid 'server' block format.");
+    ServerConfig server;
+    i += 2;
     bool blockClose = false;
     bool hasListen = false, hasServerName = false, hasMaxBody = false;
     while (i < tokens.size())
@@ -138,19 +149,16 @@ Server Parser::parseServer(const std::vector<std::string>& tokens)
             break;
         }
         else
-            throw std::runtime_error("Erro: diretiva desconhecida '" + token + "'.");
+            throw std::runtime_error("Error: unknown directive '" + token + "'.");
     }
 
     if (!blockClose)
-        throw std::runtime_error("Erro: bloco server não está fechado com '}'.");
-
-    if (i < tokens.size())
-        throw std::runtime_error("Erro: tokens extra após o fechamento do 'server'.");
+        throw std::runtime_error("Error: server block is not closed with '}'.");
 
     return server;
 }
 
-std::string Parser::preprocess(const std::string& line)
+std::string ConfigParser::preprocess(const std::string& line)
 {
     std::string result;
     for (std::string::size_type j = 0; j < line.size(); ++j)
@@ -174,14 +182,15 @@ std::string Parser::preprocess(const std::string& line)
     return result;
 }
 
-Server Parser::parseConfigFile(const std::string& filename)
+std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filename)
 {
     std::vector<std::string> tokens;
+    std::vector<ServerConfig> servers;
     std::ifstream file(filename.c_str());
 
     if (!file.is_open())
     {
-        throw std::runtime_error("Erro ao abrir o arquivo de configuração: " + filename);
+        throw std::runtime_error("Error opening configuration file: " + filename);
     }
 
     std::string line;
@@ -196,11 +205,21 @@ Server Parser::parseConfigFile(const std::string& filename)
         }
     }
 
-    for (size_t i = 0; i < tokens.size(); ++i)
+//    for (size_t i = 0; i < tokens.size(); ++i)
+//    {
+//        std::cout << "Token " << i << ": " << tokens[i] << std::endl;
+//    }
+
+    size_t i = 0;
+    while (i < tokens.size())
     {
-        std::cout << "Token " << i << ": " << tokens[i] << std::endl;
+        if (tokens[i] != "server")
+            throw std::runtime_error("Error: expected 'server' block.");
+        servers.push_back(parseServer(tokens, i));
     }
 
-    Server server = parseServer(tokens);
-    return server;
+    if (servers.empty())
+        throw std::runtime_error("Error: configuration file must contain at least one 'server' block.");
+
+    return servers;
 }
