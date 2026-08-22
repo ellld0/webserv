@@ -196,12 +196,12 @@ std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filen
     std::string line;
     while (std::getline(file, line))
     {
-        std::string linhaprocessada = preprocess(line);
-        std::stringstream linha_stream(linhaprocessada);
-        std::string palavra;
-        while (linha_stream >> palavra)
+        std::string processedLine = preprocess(line);
+        std::stringstream line_stream(processedLine);
+        std::string word;
+        while (line_stream >> word)
         {
-            tokens.push_back(palavra);
+            tokens.push_back(word);
         }
     }
 
