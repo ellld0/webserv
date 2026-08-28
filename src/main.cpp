@@ -2,9 +2,9 @@
 #include <string>
 #include <exception>
 
-#include "./inc/config/ConfigParser.hpp"
-#include "./inc/config/ServerConfig.hpp"
-#include "./inc/network/ServerManager.hpp"
+#include "../inc/config/ConfigParser.hpp"
+#include "../inc/config/ServerConfig.hpp"
+#include "../inc/network/ServerManager.hpp"
 
 int main(int argc, char **argv) {
 	std::string configFile;
@@ -22,8 +22,8 @@ int main(int argc, char **argv) {
 
 	try {
 		std::cout << "Reading config file..." << std::endl;
-		Parser parser;
-		std::vector<Server> servers = parse.parseConfigFiles(configFile);
+		ConfigParser parser;
+		std::vector<ServerConfig> servers = parser.parseConfigFile(configFile);
 		std::cout << "Starting Network Handler..." << std::endl;
 		ServerManager manager;
 		manager.init(servers);

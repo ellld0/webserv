@@ -2,11 +2,13 @@
 #define SERVERMANAGER_HPP
 
 #include <vector>
-#include "./ServerConfig.hpp"
+#include <map>
+#include "../../inc/config/ServerConfig.hpp"
+#include "../../inc/network/Client.hpp"
 
 class ServerManager {
 private:
-    std::vector<Server> _configs;
+    std::vector<ServerConfig> _configs;
     std::vector<int> _serverSockets;
 	std::map<int, Client> _clients;
 
@@ -18,7 +20,7 @@ public:
     ServerManager& operator=(const ServerManager& other);
     ~ServerManager();
 
-    void init(const std::vector<Server>& configs); // Função responsável por inicializar o Servidor
+    void init(const std::vector<ServerConfig>& configs); // Função responsável por inicializar o Servidor
 
     void run(); // O loop infinito do poll() (ou epoll/kqueue) - Nunca deve bloquear!
 };

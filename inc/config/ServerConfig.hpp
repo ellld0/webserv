@@ -7,24 +7,27 @@
 #include <map>
 #include <functional>
 
-class Server {
+class ServerConfig {
 	private:
 		int port_;
 		std::string serverName_;
 		std::string clientMaxBodySize_;
-		std::vector<Location> locations_;
+		std::vector<LocationConfig> locations_;
 		std::map<int, std::string> errorPages_;
 
 	public:
-		Server();
+		ServerConfig();
+		ServerConfig(const ServerConfig& other);
+		ServerConfig& operator=(const ServerConfig& other);
+		~ServerConfig();
 		void setPort(int port);
 		int getPort() const;
 		void setServerName(const std::string& serverName);
 		const std::string& getServerName() const;
 		void setClientMaxBodySize(const std::string& size);
 		const std::string& getClientMaxBodySize() const;
-		void addLocation(const Location& location);
-		const std::vector<Location>& getLocations() const;
+		void addLocation(const LocationConfig& location);
+		const std::vector<LocationConfig>& getLocations() const;
 		void setErrorPage(int errorCode, const std::string& page);
 		const std::map<int, std::string>& getErrorPages() const;
 		std::string getErrorPage(int errorCode) const;

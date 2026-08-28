@@ -1,54 +1,82 @@
-#include "ServerConfig.hpp"
+#include "../../inc/config/ServerConfig.hpp"
 
-Server::Server() : port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
+ServerConfig::ServerConfig() : port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
 
-void Server::setPort(int port) {
+ServerConfig::ServerConfig(const ServerConfig& other)
+    : port_(other.port_),
+      serverName_(other.serverName_),
+      clientMaxBodySize_(other.clientMaxBodySize_),
+      locations_(other.locations_),
+      errorPages_(other.errorPages_)
+{
+
+}
+
+ServerConfig& ServerConfig::operator=(const ServerConfig& other)
+{
+    if (this != &other)
+    {
+        port_ = other.port_;
+        serverName_ = other.serverName_;
+        clientMaxBodySize_ = other.clientMaxBodySize_;
+        locations_ = other.locations_;
+        errorPages_ = other.errorPages_;
+    }
+    return *this;
+}
+
+ServerConfig::~ServerConfig()
+{
+
+}
+
+void ServerConfig::setPort(int port) {
     port_ = port;
 }
 
-int Server::getPort() const {
+int ServerConfig::getPort() const {
     return port_;
 }
 
-void Server::setServerName(const std::string& serverName){
+void ServerConfig::setServerName(const std::string& serverName){
     serverName_ = serverName;
 }
 
-const std::string& Server::getServerName() const {
+const std::string& ServerConfig::getServerName() const {
     return serverName_;
 }
 
-void Server::setClientMaxBodySize(const std::string& size)
+void ServerConfig::setClientMaxBodySize(const std::string& size)
 {
     clientMaxBodySize_ = size;
 }
 
-const std::string& Server::getClientMaxBodySize() const
+const std::string& ServerConfig::getClientMaxBodySize() const
 {
     return clientMaxBodySize_;
 }
 
-void Server::addLocation(const Location& location)
+void ServerConfig::addLocation(const LocationConfig& location)
 {
     locations_.push_back(location);
 }
 
-const std::vector<Location>& Server::getLocations() const
+const std::vector<LocationConfig>& ServerConfig::getLocations() const
 {
     return locations_;
 }
 
-void Server::setErrorPage(int errorCode, const std::string& page)
+void ServerConfig::setErrorPage(int errorCode, const std::string& page)
 {
     errorPages_[errorCode] = page;
 }
 
-const std::map<int, std::string>& Server::getErrorPages() const
+const std::map<int, std::string>& ServerConfig::getErrorPages() const
 {
     return errorPages_;
 }
 
-std::string Server::getErrorPage(int errorCode) const
+std::string ServerConfig::getErrorPage(int errorCode) const
 {
     std::map<int, std::string>::const_iterator it = errorPages_.find(errorCode);
     if (it != errorPages_.end())
