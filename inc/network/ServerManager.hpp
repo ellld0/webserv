@@ -2,7 +2,9 @@
 #define SERVERMANAGER_HPP
 
 #include <vector>
-#include "ServerConfig.hpp"
+#include <map>
+#include "../../inc/config/ServerConfig.hpp"
+#include "../../inc/network/Client.hpp"
 
 class ServerManager {
 private:
