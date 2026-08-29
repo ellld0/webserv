@@ -1,4 +1,4 @@
-#include "ServerConfig.hpp"
+#include "../../includes/config/ServerConfig.hpp"
 
 ServerConfig::ServerConfig() : port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
 

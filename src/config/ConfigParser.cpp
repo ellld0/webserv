@@ -1,5 +1,5 @@
 #include <iostream>
-#include "ConfigParser.hpp"
+#include "../../includes/config/ConfigParser.hpp"
 #include <fstream>
 #include <stdexcept>
 #include <sstream>
@@ -8,10 +8,7 @@
 #include <cctype>
 
 
-ConfigParser::ConfigParser()
-{
-
-}
+ConfigParser::ConfigParser() {}
 
 ConfigParser::ConfigParser(const ConfigParser& other)
 {
@@ -24,101 +21,98 @@ ConfigParser& ConfigParser::operator=(const ConfigParser& other)
     return *this;
 }
 
-ConfigParser::~ConfigParser()
-{
+ConfigParser::~ConfigParser() {}
 
+bool ConfigParser::isValidPort(const std::string& portString)
+{
+	if (portString.empty())
+	{
+		return false;
+	}
+
+	for (std::string::size_type i = 0; i < portString.size(); ++i)
+	{
+		if (!std::isdigit(portString[i]))
+		{
+			return false;
+		}
+	}
+		int port = std::atoi(portString.c_str());
+	if (port < 1 || port > 65535)
+	{
+		return false;
+	}
+	return true;
 }
 
-    bool ConfigParser::isValidPort(const std::string& portString)
-    {
-        if (portString.empty())
-        {
-            return false;
-        }
+bool ConfigParser::isValidBodySize(const std::string& sizeString)
+{
+	if (sizeString.empty())
+	{
+		return false;
+	}
+	if(sizeString.size() < 2)
+	{
+		return false;
+	}
+	char lastChar = sizeString[sizeString.size() - 1];
+	if (lastChar != 'K' && lastChar != 'M' && lastChar != 'G')
+	{
+		return false;
+	}
 
-        for (std::string::size_type i = 0; i < portString.size(); ++i)
-        {
-            if (!std::isdigit(portString[i]))
-            {
-                return false;
-            }
-        }
-         int port = std::atoi(portString.c_str());
-        if (port < 1 || port > 65535)
-        {
-            return false;
-        }
-        return true;
-    }
+	for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
+	{
+		if(!std::isdigit(sizeString[i]))
+		{
+			return false;
+		}
+	}
 
-    bool ConfigParser::isValidBodySize(const std::string& sizeString)
-    {
-        if (sizeString.empty())
-        {
-            return false;
-        }
-        if(sizeString.size() < 2)
-        {
-            return false;
-        }
-        char lastChar = sizeString[sizeString.size() - 1];
-        if (lastChar != 'K' && lastChar != 'M' && lastChar != 'G')
-        {
-            return false;
-        }
+	return true;
+}
 
-        for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
-        {
-            if(!std::isdigit(sizeString[i]))
-            {
-                return false;
-            }
-        }
+LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
+{
+	if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
+		throw std::runtime_error("Error: invalid syntax in 'location' block header.");
+	LocationConfig location;
+	location.setPath(tokens[i + 1]);
+	i += 3;
+	bool blockClose = false;
+	bool hasRoot = false, hasMethod = false, hasDirListing = false;
+	bool hasIndex = false, hasUpload = false, hasReturn = false;
+	while (i < tokens.size())
+	{
+		const std::string& token = tokens[i];
 
-        return true;
-    }
+		if (token == "root")
+			parseRootDirective(location, tokens, i, hasRoot);
+		else if (token == "methods")
+			parseMethodsDirective(location, tokens, i, hasMethod);
+		else if (token == "directory_listing")
+			parseDirListingDirective(location, tokens, i, hasDirListing);
+		else if (token == "return")
+			parseReturnDirective(location, tokens, i, hasReturn);
+		else if (token == "index")
+			parseIndexDirective(location, tokens, i, hasIndex);
+		else if (token == "upload")
+			parseUploadDirective(location, tokens, i, hasUpload);
+		else if (token == "}")
+		{
+			blockClose = true;
+			++i;
+			break;
+		}
+		else
+			throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
+	}
 
-    LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
-    {
-       if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
-            throw std::runtime_error("Error: invalid syntax in 'location' block header.");
-        LocationConfig location;
-        location.setPath(tokens[i + 1]);
-        i += 3;
-        bool blockClose = false;
-        bool hasRoot = false, hasMethod = false, hasDirListing = false;
-        bool hasIndex = false, hasUpload = false, hasReturn = false;
-        while (i < tokens.size())
-        {
-            const std::string& token = tokens[i];
+	if (!blockClose)
+		throw std::runtime_error("Error: location block is not closed with '}'.");
 
-            if (token == "root")
-                parseRootDirective(location, tokens, i, hasRoot);
-            else if (token == "methods")
-                parseMethodsDirective(location, tokens, i, hasMethod);
-            else if (token == "directory_listing")
-                parseDirListingDirective(location, tokens, i, hasDirListing);
-            else if (token == "return")
-                parseReturnDirective(location, tokens, i, hasReturn);
-            else if (token == "index")
-                parseIndexDirective(location, tokens, i, hasIndex);
-            else if (token == "upload")
-                parseUploadDirective(location, tokens, i, hasUpload);
-            else if (token == "}")
-            {
-                blockClose = true;
-                ++i;
-                break;
-            }
-            else
-                throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
-        }
-
-        if (!blockClose)
-            throw std::runtime_error("Error: location block is not closed with '}'.");
-
-        return location;
-    }
+	return location;
+}
     
 ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, size_t& i)
 {
@@ -196,20 +190,14 @@ std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filen
     std::string line;
     while (std::getline(file, line))
     {
-        std::string linhaprocessada = preprocess(line);
-        std::stringstream linha_stream(linhaprocessada);
-        std::string palavra;
-        while (linha_stream >> palavra)
+        std::string processedLine = preprocess(line);
+        std::stringstream line_stream(processedLine);
+        std::string word;
+        while (line_stream >> word)
         {
-            tokens.push_back(palavra);
+            tokens.push_back(word);
         }
     }
-
-//    for (size_t i = 0; i < tokens.size(); ++i)
-//    {
-//        std::cout << "Token " << i << ": " << tokens[i] << std::endl;
-//    }
-
     size_t i = 0;
     while (i < tokens.size())
     {

@@ -1,4 +1,4 @@
-#include  "LocationConfig.hpp"
+#include  "../../includes/config/LocationConfig.hpp"
 
 LocationConfig::LocationConfig() : path_(""),
                      root_(""),
