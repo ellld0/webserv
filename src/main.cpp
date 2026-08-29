@@ -2,9 +2,9 @@
 #include <string>
 #include <exception>
 
-#include "../include/config/ConfigParser.hpp"
-#include "../include/config/ServerConfig.hpp"
-#include "../include/network/ServerManager.hpp"
+#include "../includes/config/ConfigParser.hpp"
+#include "../includes/config/ServerConfig.hpp"
+#include "../includes/network/ServerManager.hpp"
 
 int main(int argc, char **argv) {
 	std::string configFile;
@@ -21,14 +21,34 @@ int main(int argc, char **argv) {
 	}
 
 	try {
-		std::cout << "Reading config file..." << std::endl;
-		ConfigParser parser;
-		std::vector<ServerConfig> servers = parser.parseConfigFile(configFile);
-		std::cout << "Starting Network Handler..." << std::endl;
-		ServerManager manager;
-		manager.init(servers);
-		std::cout << "Server is running...Press Ctrl+C to stop" << std::endl;
-		manager.run();
+		std::cout << "[INFO] Reading config file..." << std::endl;
+		ConfigParser parser; 														//#Temporary inactive, waiting for finish functions - bassiro
+		std::vector<ServerConfig> servers = parser.parseConfigFile(configFile);		//#Temporary inactive, waiting for finish functions - bassiro
+		
+		/*This block is only for mocking data to Network test
+		std::vector<ServerConfig> mockServers;
+
+		ServerConfig server1;
+		server1.setPort(8080);
+		server1.setServerName("Localhost");
+		server1.setClientMaxBodySize("10M");
+		mockServers.push_back(server1);
+
+		ServerConfig server2;
+		server2.setPort(8081);
+		server2.setServerName("Localhost2");
+		server2.setClientMaxBodySize("1M");
+		mockServers.push_back(server2);
+
+		std::cout << "[INFO] Mock servers created. Total Servers: " 
+              << mockServers.size() << std::cout << std::endl;
+		End mocking data*/
+
+		std::cout << "[INFO] Starting Network Handler..." << std::endl;
+		//ServerManager manager;
+		//manager.init(servers);
+		std::cout << "[INFO] Server is running...Press Ctrl+C to stop" << std::endl;
+		//manager.run();
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Fatal Error: " << e.what() << std::endl;

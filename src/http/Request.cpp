@@ -1,4 +1,4 @@
-#include "../../inc/http/Request.hpp"
+#include "../../includes/http/Request.hpp"
 
 Request::Request() : _complete(false) {}
 Request::~Request() {}

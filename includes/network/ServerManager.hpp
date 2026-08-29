@@ -3,26 +3,31 @@
 
 #include <vector>
 #include <map>
-#include "../../inc/config/ServerConfig.hpp"
-#include "../../inc/network/Client.hpp"
+#include <iostream>
+#include <stdexcept>
+#include "../config/ServerConfig.hpp"
+#include "./Client.hpp"
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 class ServerManager {
 private:
-    std::vector<ServerConfig> _configs;
-    std::vector<int> _serverSockets;
-	std::map<int, Client> _clients;
-
-    void setupSockets(); 
-
+    std::vector<struct pollfd> _pollFds;
+    std::map<int, ServerConfig> _serverSockets;
+	void setupSocket(const ServerConfig& config);
 public:
     ServerManager();
     ServerManager(const ServerManager& other);
     ServerManager& operator=(const ServerManager& other);
     ~ServerManager();
 
-    void init(const std::vector<ServerConfig>& configs); // Função responsável por inicializar o Servidor
+    void init(const std::vector<ServerConfig>& configs);
 
-    void run(); // O loop infinito do poll() (ou epoll/kqueue) - Nunca deve bloquear!
+    void run();
 };
 
 #endif
