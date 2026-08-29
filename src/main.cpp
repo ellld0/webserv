@@ -45,10 +45,10 @@ int main(int argc, char **argv) {
 		End mocking data*/
 
 		std::cout << "[INFO] Starting Network Handler..." << std::endl;
-		//ServerManager manager;
-		//manager.init(servers);
+		ServerManager manager;
+		manager.init(servers);
 		std::cout << "[INFO] Server is running...Press Ctrl+C to stop" << std::endl;
-		//manager.run();
+		manager.run();
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Fatal Error: " << e.what() << std::endl;
