@@ -1,5 +1,6 @@
 #ifndef REQUEST_HPP
 # define REQUEST_HPP
+
 # include <string>
 # include <map>
 # include <sstream>
@@ -22,6 +23,8 @@ class Request
     public:
          Request();
         ~Request();
+        Request(const Request &other);
+        Request &operator=(const Request &other);
 
         bool        parse(const std::string& rawBuffer);
         bool        isComplete() const;
@@ -35,3 +38,4 @@ class Request
 };
 
 #endif
+

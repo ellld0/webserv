@@ -3,6 +3,17 @@
 Request::Request() : _complete(false) {}
 Request::~Request() {}
 
+Request::Request(const Request &other)
+{
+    (void)other;
+}
+
+Request &Request::operator=(const Request &other)
+{
+    (void)other;
+    return *this;
+}
+
 void Request::_parseRequestLine(const std::string& line)
 {
     std::istringstream ss(line);
