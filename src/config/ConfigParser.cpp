@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../../inc/config/ConfigParser.hpp"
+#include "../../includes/config/ConfigParser.hpp"
 #include <fstream>
 #include <stdexcept>
 #include <sstream>
@@ -8,10 +8,7 @@
 #include <cctype>
 
 
-ConfigConfigParser::ConfigConfigParser()
-{
-
-}
+ConfigParser::ConfigParser() {}
 
 ConfigParser::ConfigParser(const ConfigParser& other)
 {
@@ -24,117 +21,98 @@ ConfigParser& ConfigParser::operator=(const ConfigParser& other)
     return *this;
 }
 
-ConfigConfigParser::ConfigParser(const ConfigParser& other)
+ConfigParser::~ConfigParser() {}
+
+bool ConfigParser::isValidPort(const std::string& portString)
 {
-    (void)other;
+	if (portString.empty())
+	{
+		return false;
+	}
+
+	for (std::string::size_type i = 0; i < portString.size(); ++i)
+	{
+		if (!std::isdigit(portString[i]))
+		{
+			return false;
+		}
+	}
+		int port = std::atoi(portString.c_str());
+	if (port < 1 || port > 65535)
+	{
+		return false;
+	}
+	return true;
 }
 
-ConfigParser& ConfigParser::operator=(const ConfigParser& other)
+bool ConfigParser::isValidBodySize(const std::string& sizeString)
 {
-    (void)other;
-    return *this;
+	if (sizeString.empty())
+	{
+		return false;
+	}
+	if(sizeString.size() < 2)
+	{
+		return false;
+	}
+	char lastChar = sizeString[sizeString.size() - 1];
+	if (lastChar != 'K' && lastChar != 'M' && lastChar != 'G')
+	{
+		return false;
+	}
+
+	for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
+	{
+		if(!std::isdigit(sizeString[i]))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
-ConfigParser::~ConfigConfigParser()
+LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
 {
+	if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
+		throw std::runtime_error("Error: invalid syntax in 'location' block header.");
+	LocationConfig location;
+	location.setPath(tokens[i + 1]);
+	i += 3;
+	bool blockClose = false;
+	bool hasRoot = false, hasMethod = false, hasDirListing = false;
+	bool hasIndex = false, hasUpload = false, hasReturn = false;
+	while (i < tokens.size())
+	{
+		const std::string& token = tokens[i];
 
+		if (token == "root")
+			parseRootDirective(location, tokens, i, hasRoot);
+		else if (token == "methods")
+			parseMethodsDirective(location, tokens, i, hasMethod);
+		else if (token == "directory_listing")
+			parseDirListingDirective(location, tokens, i, hasDirListing);
+		else if (token == "return")
+			parseReturnDirective(location, tokens, i, hasReturn);
+		else if (token == "index")
+			parseIndexDirective(location, tokens, i, hasIndex);
+		else if (token == "upload")
+			parseUploadDirective(location, tokens, i, hasUpload);
+		else if (token == "}")
+		{
+			blockClose = true;
+			++i;
+			break;
+		}
+		else
+			throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
+	}
+
+	if (!blockClose)
+		throw std::runtime_error("Error: location block is not closed with '}'.");
+
+	return location;
 }
-
-    bool ConfigConfigParser::isValidPort(const std::string& portString)
-    {
-        if (portString.empty())
-        {
-            return false;
-        }
-
-        for (std::string::size_type i = 0; i < portString.size(); ++i)
-        {
-            if (!std::isdigit(portString[i]))
-            {
-                return false;
-            }
-        }
-         int port = std::atoi(portString.c_str());
-        if (port < 1 || port > 65535)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    bool ConfigConfigParser::isValidBodySize(const std::string& sizeString)
-    {
-        if (sizeString.empty())
-        {
-            return false;
-        }
-        if(sizeString.size() < 2)
-        {
-            return false;
-        }
-        char lastChar = sizeString[sizeString.size() - 1];
-        if (lastChar != 'K' && lastChar != 'M' && lastChar != 'G')
-        {
-            return false;
-        }
-
-        for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
-        {
-            if(!std::isdigit(sizeString[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
-    LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& tokens, size_t& i)
-    {
-       if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
-            throw std::runtime_error("Error: invalid syntax in 'location' block header.");
-        LocationConfig location;
-            throw std::runtime_error("Error: invalid syntax in 'location' block header.");
-        LocationConfig location;
-        location.setPath(tokens[i + 1]);
-        i += 3;
-        bool blockClose = false;
-        bool hasRoot = false, hasMethod = false, hasDirListing = false;
-        bool hasIndex = false, hasUpload = false, hasReturn = false;
-        while (i < tokens.size())
-        {
-            const std::string& token = tokens[i];
-
-            if (token == "root")
-                parseRootDirective(location, tokens, i, hasRoot);
-            else if (token == "methods")
-                parseMethodsDirective(location, tokens, i, hasMethod);
-            else if (token == "directory_listing")
-                parseDirListingDirective(location, tokens, i, hasDirListing);
-            else if (token == "return")
-                parseReturnDirective(location, tokens, i, hasReturn, hasReturn);
-            else if (token == "index")
-                parseIndexDirective(location, tokens, i, hasIndex);
-            else if (token == "upload")
-                parseUploadDirective(location, tokens, i, hasUpload);
-            else if (token == "}")
-            {
-                blockClose = true;
-                ++i;
-                break;
-            }
-            else
-                throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
-                throw std::runtime_error("Error: unknown directive in 'location': " + token + ".");
-        }
-
-        if (!blockClose)
-            throw std::runtime_error("Error: location block is not closed with '}'.");
-            throw std::runtime_error("Error: location block is not closed with '}'.");
-
-        return location;
-    }
     
 ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, size_t& i)
 {
@@ -166,7 +144,6 @@ ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, s
         }
         else
             throw std::runtime_error("Error: unknown directive '" + token + "'.");
-            throw std::runtime_error("Error: unknown directive '" + token + "'.");
     }
 
     if (!blockClose)
@@ -175,7 +152,6 @@ ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, s
     return server;
 }
 
-std::string ConfigParser::preprocess(const std::string& line)
 std::string ConfigParser::preprocess(const std::string& line)
 {
     std::string result;
@@ -209,7 +185,6 @@ std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filen
     if (!file.is_open())
     {
         throw std::runtime_error("Error opening configuration file: " + filename);
-        throw std::runtime_error("Error opening configuration file: " + filename);
     }
 
     std::string line;
@@ -223,12 +198,6 @@ std::vector<ServerConfig> ConfigParser::parseConfigFile(const std::string& filen
             tokens.push_back(word);
         }
     }
-
-//    for (size_t i = 0; i < tokens.size(); ++i)
-//    {
-//        std::cout << "Token " << i << ": " << tokens[i] << std::endl;
-//    }
-
     size_t i = 0;
     while (i < tokens.size())
     {
