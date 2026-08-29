@@ -17,6 +17,9 @@ class LocationConfig {
 		std::string uploadPath_;
 	public:
 		LocationConfig();
+		LocationConfig(const LocationConfig& other);
+		LocationConfig& operator=(const LocationConfig& other);
+		~LocationConfig();
 		void setPath(const std::string& path);
 		const std::string& getPath() const;
 		void setRoot(const std::string& root);
