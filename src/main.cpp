@@ -1,10 +1,19 @@
 #include <iostream>
 #include <string>
 #include <exception>
+#include <csignal>
+#include <cstring>
 
 #include "../includes/config/ConfigParser.hpp"
 #include "../includes/config/ServerConfig.hpp"
 #include "../includes/network/ServerManager.hpp"
+
+volatile sig_atomic_t g_server_running = 1;
+
+void handle_sigint(int sig) {
+    (void)sig;
+    g_server_running = 0;
+}
 
 int main(int argc, char **argv) {
 	std::string configFile;
@@ -19,7 +28,18 @@ int main(int argc, char **argv) {
 		std::cout << "Error! Correct use is ./webserv <configFileName>" << std::endl;
 		return 1;
 	}
-
+	
+	struct sigaction sa;
+    std::memset(&sa, 0, sizeof(sa)); // Limpa a struct (precisa do #include <cstring>)
+    sa.sa_handler = handle_sigint;   // Aponta para a sua função
+    // O pulo do gato: deixamos as flags zeradas, ou seja, SEM a flag SA_RESTART
+    sigemptyset(&sa.sa_mask);
+    
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        std::cerr << "[ERROR] Failed to setup Sigaction." << std::endl;
+        return 1;
+    }
+	
 	try {
 		std::cout << "[INFO] Reading config file..." << std::endl;
 		ConfigParser parser; 														//#Temporary inactive, waiting for finish functions - bassiro

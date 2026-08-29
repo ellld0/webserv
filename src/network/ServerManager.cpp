@@ -1,5 +1,8 @@
 #include "../../includes/network/ServerManager.hpp"
 #include <cstring>
+#include <csignal>
+
+extern volatile sig_atomic_t g_server_running;
 
 ServerManager::ServerManager() {}
 
@@ -83,16 +86,17 @@ void ServerManager::run() {
 		std::cout << "[ERROR] No sockets found to polling" << std::endl;
 	}
 	std::cout << "[INFO] Server listening..." << std::endl;
-    while (true) {
-		int poll_count = poll(_pollFds.data(), _pollFds.size(), 5000);
+    while (g_server_running) {
+		int poll_count = poll(_pollFds.data(), _pollFds.size(), 1000);
 		
 		if (poll_count < 0) {
 			std::cout << "[ERROR] poll() failed." << std::endl;
 			break;
 		}
 		else if (0 == poll_count) {
-			std::cout << "[DEBUG] Idle Server, checking for dead clients..." << std::endl;
+			//std::cout << "[DEBUG] Idle Server, checking for dead clients..." << std::endl;
 			// Future clean dead client function
+			continue; 
 		}
 		else {
 			for (size_t i = 0; i < _pollFds.size(); i++) {
