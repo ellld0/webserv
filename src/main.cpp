@@ -2,9 +2,9 @@
 #include <string>
 #include <exception>
 
-#include "../inc/config/ConfigParser.hpp"
-#include "../inc/config/ServerConfig.hpp"
-#include "../inc/network/ServerManager.hpp"
+#include "../include/config/ConfigParser.hpp"
+#include "../include/config/ServerConfig.hpp"
+#include "../include/network/ServerManager.hpp"
 
 int main(int argc, char **argv) {
 	std::string configFile;

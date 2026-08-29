@@ -8,7 +8,7 @@ webserv/
 │   ├── 404.html             # Páginas de erro padrão 
 │   ├── uploads/             # Pasta autorizada para o envio de arquivos dos clientes 
 │   └── cgi-bin/             # Scripts CGI (como arquivos .php ou .py) para testar a execução 
-├── inc/                     # Todos os arquivos de cabeçalho (.hpp) 
+├── include/                 # Todos os arquivos de cabeçalho (.hpp) 
 │   ├── config/              # Contratos do Dev 1 (Fase 1)
 │   │   ├── ConfigParser.hpp
 │   │   ├── ServerConfig.hpp
