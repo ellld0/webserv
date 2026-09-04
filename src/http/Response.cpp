@@ -1,6 +1,6 @@
-#include "Response.hpp"
-#include "Request.hpp"
-#include "CgiHandler.hpp"
+#include "../../includes/http/Response.hpp"
+#include "../../includes/http/Request.hpp"
+#include "../../includes/http/CgiHandler.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -76,7 +76,7 @@ std::string Response::_reasonPhrase(int code) const
 bool Response::_fileExists(const std::string& path) const
 {
     struct stat st;
-    return (stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode));
+    return (stat(path.c_str(), &st) == 0 && ((st.st_mode & S_IFMT) == S_IFREG));
 }
 
 bool Response::_loadFile(const std::string& path, std::string& out) const
@@ -289,25 +289,12 @@ void Response::_handleCgi(const Request& req, const std::string& scriptPath)
 }
 void Response::_finalizeHeaders()
 {
-    _setHeader("Content-Length", std::to_string(_body.size()));
+    std::ostringstream lengthStream;
+    lengthStream << _body.size();
+    _setHeader("Content-Length", lengthStream.str());
     _setHeader("Date", _httpDateNow());
     _setHeader("Connection", "close");
     _setHeader("Server", "WebServer");
-}
-
-void Response::_handleCgi(const Request& req, const std::string& scriptPath)
-{
-    CgiHandler cgi;
-    try
-    {
-        const std::string raw = cgi.execute(req, scriptPath);
-        _setStatus(200);
-        _parseCgiOutput(raw);
-    }
-    catch (...)
-    {
-        _setStatus(500);
-    }
 }
 
 void Response::_handleGet(const Request& req, const ServerConfig& config)

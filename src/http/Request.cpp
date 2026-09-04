@@ -39,11 +39,22 @@ void Request::_parseHeaders(const std::string& rawHeaders)
     {
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
+
+        if (line.empty())
+            continue;
+
         size_t colonPos = line.find(':');
         if (colonPos == std::string::npos)
             continue;
+
         std::string headerName = line.substr(0, colonPos);
-        std::string headerValue = line.substr(colonPos + 2);
+        std::string headerValue;
+        if (colonPos + 1 < line.size())
+            headerValue = line.substr(colonPos + 1);
+
+        while (!headerValue.empty() && (headerValue[0] == ' ' || headerValue[0] == '\t'))
+            headerValue.erase(0, 1);
+
         _headers[headerName] = headerValue;
     }
 }
