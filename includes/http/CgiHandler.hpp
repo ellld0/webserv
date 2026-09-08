@@ -10,8 +10,8 @@ class Response;
 class CgiHandler
 {
     private:
+        std::string              _interpreterFor(const std::string& scriptPath) const;
         std::vector<std::string> _buildEnvp(const Request& req, const std::string& scriptPath);
-        std::string              _readPipeOutput(int fd);
         
     public:
         CgiHandler();
