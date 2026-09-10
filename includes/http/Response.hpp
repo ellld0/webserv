@@ -3,7 +3,7 @@
 
 # include <string>
 # include <map>
-# include "ServerConfig.hpp"
+# include "../config/ServerConfig.hpp"
 
 class Request;
 

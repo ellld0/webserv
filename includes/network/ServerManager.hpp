@@ -18,6 +18,7 @@ class ServerManager {
 private:
     std::vector<struct pollfd> _pollFds;
     std::map<int, ServerConfig> _serverSockets;
+	std::map<int, int> _clientToServer;
 	void setupSocket(const ServerConfig& config);
 public:
     ServerManager();

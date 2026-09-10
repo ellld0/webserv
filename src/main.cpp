@@ -8,12 +8,6 @@
 #include "../includes/config/ServerConfig.hpp"
 #include "../includes/network/ServerManager.hpp"
 
-volatile sig_atomic_t g_server_running = 1;
-
-void handle_sigint(int sig) {
-    (void)sig;
-    g_server_running = 0;
-}
 
 int main(int argc, char **argv) {
 	std::string configFile;
@@ -29,41 +23,10 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	
-	struct sigaction sa;
-    std::memset(&sa, 0, sizeof(sa)); // Limpa a struct (precisa do #include <cstring>)
-    sa.sa_handler = handle_sigint;   // Aponta para a sua função
-    // O pulo do gato: deixamos as flags zeradas, ou seja, SEM a flag SA_RESTART
-    sigemptyset(&sa.sa_mask);
-    
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-        std::cerr << "[ERROR] Failed to setup Sigaction." << std::endl;
-        return 1;
-    }
-	
 	try {
 		std::cout << "[INFO] Reading config file..." << std::endl;
-		ConfigParser parser; 														//#Temporary inactive, waiting for finish functions - bassiro
-		std::vector<ServerConfig> servers = parser.parseConfigFile(configFile);		//#Temporary inactive, waiting for finish functions - bassiro
-		
-		/*This block is only for mocking data to Network test
-		std::vector<ServerConfig> mockServers;
-
-		ServerConfig server1;
-		server1.setPort(8080);
-		server1.setServerName("Localhost");
-		server1.setClientMaxBodySize("10M");
-		mockServers.push_back(server1);
-
-		ServerConfig server2;
-		server2.setPort(8081);
-		server2.setServerName("Localhost2");
-		server2.setClientMaxBodySize("1M");
-		mockServers.push_back(server2);
-
-		std::cout << "[INFO] Mock servers created. Total Servers: " 
-              << mockServers.size() << std::cout << std::endl;
-		End mocking data*/
-
+		ConfigParser parser;
+		std::vector<ServerConfig> servers = parser.parseConfigFile(configFile);
 		std::cout << "[INFO] Starting Network Handler..." << std::endl;
 		ServerManager manager;
 		manager.init(servers);
