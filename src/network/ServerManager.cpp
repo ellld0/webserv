@@ -36,7 +36,7 @@ void ServerManager::init(const std::vector<ServerConfig>& configs) {
         } catch (const std::exception& e) {
             std::cerr << "[ERROR] Failed to open socket. " << configs[i].getPort() 
                       << ": " << e.what() << std::endl;
-            // Need to choose what to do if one server fail. Down everything or just continue without this server?
+            throw std::runtime_error("Server initialization aborted due to bind failure.");
         }
     }
 }
@@ -209,23 +209,18 @@ void ServerManager::closeFd(int active_fd, size_t &i) {
 
 size_t ServerManager::parseBodySize(const std::string& size_str) {
     if (size_str.empty()) {
-        return 1048576; // Padrão seguro de 1MB se a string vier vazia
+        return 1048576;
     }
-
 	char* end;
 	size_t size = std::strtoul(size_str.c_str(), &end, 10);
-
-    // Verificamos qual letra sobrou no ponteiro end
     if (*end == 'M' || *end == 'm') {
-        size *= (1024 * 1024); // Transforma Megabytes em Bytes
+        size *= (1024 * 1024);
     } 
     else if (*end == 'K' || *end == 'k') {
-        size *= 1024;          // Transforma Kilobytes em Bytes
+        size *= 1024;
     }
     else if (*end == 'G' || *end == 'g') {
-        size *= (1024 * 1024 * 1024); // Transforma Gigabytes em Bytes
-    }
-    
-    // Se não tiver letra nenhuma, ele já leu os bytes diretos e retorna o 'size' original
+        size *= (1024 * 1024 * 1024);
+    }   
     return size;
 }

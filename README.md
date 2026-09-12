@@ -1,4 +1,4 @@
-*Este projeto foi criado como parte do currículo da 42 por bnanque ...*
+*This project has been created as part of the 42 curriculum by bnanque, gabriede, makamins*
 
 # Webserv
 
@@ -18,10 +18,10 @@ The configuration parser is responsible for:
 - Validating accepted methods: `GET`, `POST`, and `DELETE`.
 - Parsing client body limits, error pages, roots, index files, directory listing, uploads, and redirects.
 - Detecting duplicate directives and malformed configuration blocks.
-
 ## Instruções
 
 ### Requirements
+
 
 - A Unix-like operating system.
 - A C++ compiler with C++98 support.
@@ -100,7 +100,9 @@ The current sample configuration demonstrates multiple listening ports, static c
 ### Use of artificial intelligence
 
 Artificial intelligence was used as a development and review assistant. It helped with:
-
+ - Frontend construction
+ - General doubts
+ - 
 
 The final design decisions, code integration, testing, and responsibility for the submitted implementation remain with the project team.
 
