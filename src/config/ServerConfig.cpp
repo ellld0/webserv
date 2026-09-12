@@ -1,9 +1,10 @@
 #include "../../includes/config/ServerConfig.hpp"
 
-ServerConfig::ServerConfig() : port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
+ServerConfig::ServerConfig() : interface_("0.0.0.0"), port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
 
 ServerConfig::ServerConfig(const ServerConfig& other)
-    : port_(other.port_),
+        : interface_(other.interface_),
+            port_(other.port_),
       serverName_(other.serverName_),
       clientMaxBodySize_(other.clientMaxBodySize_),
       locations_(other.locations_),
@@ -16,6 +17,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other)
 {
     if (this != &other)
     {
+        interface_ = other.interface_;
         port_ = other.port_;
         serverName_ = other.serverName_;
         clientMaxBodySize_ = other.clientMaxBodySize_;
@@ -36,6 +38,14 @@ void ServerConfig::setPort(int port) {
 
 int ServerConfig::getPort() const {
     return port_;
+}
+
+void ServerConfig::setInterface(const std::string& interfaceName) {
+    interface_ = interfaceName;
+}
+
+const std::string& ServerConfig::getInterface() const {
+    return interface_;
 }
 
 void ServerConfig::setServerName(const std::string& serverName){

@@ -4,8 +4,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <vector>
-#include <cstdlib>
-#include <cctype>
+#include "../../includes/utils/Utils.hpp"
 
 
 ConfigParser::ConfigParser() {}
@@ -25,19 +24,19 @@ ConfigParser::~ConfigParser() {}
 
 bool ConfigParser::isValidPort(const std::string& portString)
 {
-	if (portString.empty())
+    if (portString.empty() || portString.size() > 5)
 	{
 		return false;
 	}
 
 	for (std::string::size_type i = 0; i < portString.size(); ++i)
 	{
-		if (!std::isdigit(portString[i]))
+        if (!ft_isdigit(portString[i]))
 		{
 			return false;
 		}
 	}
-		int port = std::atoi(portString.c_str());
+        int port = ft_atoi(portString.c_str());
 	if (port < 1 || port > 65535)
 	{
 		return false;
@@ -63,7 +62,7 @@ bool ConfigParser::isValidBodySize(const std::string& sizeString)
 
 	for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
 	{
-		if(!std::isdigit(sizeString[i]))
+        if(!ft_isdigit(sizeString[i]))
 		{
 			return false;
 		}
@@ -76,6 +75,10 @@ LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& token
 {
 	if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
 		throw std::runtime_error("Error: invalid syntax in 'location' block header.");
+    if (tokens[i + 1].empty() || tokens[i + 1][0] != '/')
+    {
+        throw std::runtime_error("Error: location path must start with '/'.");
+    }
 	LocationConfig location;
 	location.setPath(tokens[i + 1]);
 	i += 3;
@@ -148,6 +151,10 @@ ServerConfig ConfigParser::parseServer(const std::vector<std::string>& tokens, s
 
     if (!blockClose)
         throw std::runtime_error("Error: server block is not closed with '}'.");
+    if (!hasListen)
+        throw std::runtime_error("Error: server must contain a 'listen' directive.");
+    if (server.getLocations().empty())
+        throw std::runtime_error("Error: server must contain at least one 'location'.");
 
     return server;
 }

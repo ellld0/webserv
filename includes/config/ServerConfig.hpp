@@ -9,6 +9,7 @@
 
 class ServerConfig {
 	private:
+		std::string interface_;
 		int port_;
 		std::string serverName_;
 		std::string clientMaxBodySize_;
@@ -22,6 +23,8 @@ class ServerConfig {
 		~ServerConfig();
 		void setPort(int port);
 		int getPort() const;
+		void setInterface(const std::string& interfaceName);
+		const std::string& getInterface() const;
 		void setServerName(const std::string& serverName);
 		const std::string& getServerName() const;
 		void setClientMaxBodySize(const std::string& size);

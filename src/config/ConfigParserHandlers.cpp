@@ -1,7 +1,6 @@
 #include "../../includes/config/ConfigParser.hpp"
 #include <stdexcept>
-#include <cstdlib>
-#include <cctype>
+#include "../../includes/utils/Utils.hpp"
 
 void ConfigParser::handleListen(ServerConfig& server, const std::vector<std::string>& tokens, size_t& i, bool& hasListen)
 {
@@ -9,10 +8,25 @@ void ConfigParser::handleListen(ServerConfig& server, const std::vector<std::str
         throw std::runtime_error("Error: duplicate 'listen' directive.");
     if (i + 2 >= tokens.size() || tokens[i + 2] != ";")
         throw std::runtime_error("Error: invalid syntax in 'listen' directive.");
-    if (!isValidPort(tokens[i + 1]))
-        throw std::runtime_error("Error: invalid port '" + tokens[i + 1] + "'.");
+    const std::string& listenValue = tokens[i + 1];
+    std::string interfaceName = "0.0.0.0";
+    std::string portString = listenValue;
+    std::string::size_type separator = listenValue.find(':');
 
-    server.setPort(std::atoi(tokens[i + 1].c_str()));
+    if (separator != std::string::npos)
+    {
+        if (separator == 0 || separator + 1 >= listenValue.size()
+            || listenValue.find(':', separator + 1) != std::string::npos)
+            throw std::runtime_error("Error: invalid interface:port in 'listen'.");
+        interfaceName = listenValue.substr(0, separator);
+        portString = listenValue.substr(separator + 1);
+    }
+
+    if (!isValidPort(portString))
+        throw std::runtime_error("Error: invalid port '" + portString + "'.");
+
+    server.setInterface(interfaceName);
+    server.setPort(ft_atoi(portString.c_str()));
     hasListen = true;
     i += 3;
 }
@@ -37,11 +51,11 @@ void ConfigParser::handleErrorPage(ServerConfig& server, const std::vector<std::
 
     for (std::string::size_type j = 0; j < codeStr.size(); ++j)
     {
-        if (!std::isdigit(static_cast<unsigned char>(codeStr[j])))
+        if (!ft_isdigit(codeStr[j]))
             throw std::runtime_error("Error: error code must be numeric.");
     }
 
-    int errorCode = std::atoi(codeStr.c_str());
+    int errorCode = ft_atoi(codeStr.c_str());
     if (errorCode < 400 || errorCode > 599)
         throw std::runtime_error("Error: error code must be between 400 and 599.");
 
@@ -64,6 +78,10 @@ void ConfigParser::handleServerName(ServerConfig& server, const std::vector<std:
     if(tokens[i + 2] != ";")
         throw std::runtime_error("Error: expected ';' after 'server_name'.");
     const std::string& serverName = tokens[i + 1];
+    if (serverName.empty() || serverName == "{" || serverName == "}")
+    {
+        throw std::runtime_error("Error: server_name cannot be empty.");
+    }
     server.setServerName(serverName);
     hasServerName = true;
     i += 3;
@@ -106,6 +124,10 @@ void ConfigParser::parseRootDirective(LocationConfig& loc, const std::vector<std
         throw std::runtime_error("Error: duplicate 'root' directive.");
     if (i + 2 >= tokens.size() || tokens[i + 2] != ";")
         throw std::runtime_error("Error: expected ';' after 'root'.");
+    if (tokens[i + 1].empty() || tokens[i + 1] == "{" || tokens[i + 1] == "}")
+    {
+        throw std::runtime_error("Error: root path cannot be empty.");
+    }
     loc.setRoot(tokens[i + 1]);
     hasRoot = true;
     i += 3;
@@ -169,11 +191,11 @@ void ConfigParser::parseReturnDirective(LocationConfig& loc, const std::vector<s
 
     for (size_t j = 0; j < codeStr.size(); ++j)
     {
-        if (!std::isdigit(static_cast<unsigned char>(codeStr[j])))
+        if (!ft_isdigit(codeStr[j]))
             throw std::runtime_error("Error: redirect code must be numeric.");
     }
 
-    int redirCode = std::atoi(codeStr.c_str());
+    int redirCode = ft_atoi(codeStr.c_str());
     if (redirCode != 301 && redirCode != 302 && redirCode != 303 &&
         redirCode != 307 && redirCode != 308)
         throw std::runtime_error("Error: invalid redirect code.");
@@ -189,8 +211,10 @@ void ConfigParser::parseIndexDirective(LocationConfig& loc, const std::vector<st
         throw std::runtime_error("Error: duplicate 'index' directive.");
     if (i + 2 >= tokens.size() || tokens[i + 2] != ";")
         throw std::runtime_error("Error: expected ';' after 'index'.");
-    if (tokens[i + 1].empty())
+    if (tokens[i + 1].empty() || tokens[i + 1] == "{" || tokens[i + 1] == "}")
+    {
         throw std::runtime_error("Error: 'index' file cannot be empty.");
+    }
     loc.setIndex(tokens[i + 1]);
     hasIndex = true;
     i += 3;

@@ -52,7 +52,7 @@ void ServerManager::setupSocket(const ServerConfig& config) {
     }
 
     struct sockaddr_in address;
-    std::memset(&address, 0, sizeof(address));
+		std::memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(config.getPort()); 
@@ -205,9 +205,8 @@ size_t ServerManager::parseBodySize(const std::string& size_str) {
         return 1048576; // Padrão seguro de 1MB se a string vier vazia
     }
 
-    char* end;
-    // O strtoul lê os números e para na primeira letra. O 'end' aponta para essa letra.
-    size_t size = std::strtoul(size_str.c_str(), &end, 10);
+	char* end;
+	size_t size = std::strtoul(size_str.c_str(), &end, 10);
 
     // Verificamos qual letra sobrou no ponteiro end
     if (*end == 'M' || *end == 'm') {
