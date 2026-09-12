@@ -17,7 +17,14 @@ ServerManager& ServerManager::operator=(const ServerManager& other) {
 }
 
 ServerManager::~ServerManager() {
-    // Need to close all FD`s open
+	for (size_t i = 0; i < _pollFds.size(); i++) {
+		if (_pollFds[i].fd >= 0) {
+			close(_pollFds[i].fd);
+		}
+	}
+	_pollFds.clear();
+	_clients.clear();
+	_serverSockets.clear();
 }
 
 void ServerManager::init(const std::vector<ServerConfig>& configs) {
@@ -52,7 +59,7 @@ void ServerManager::setupSocket(const ServerConfig& config) {
     }
 
     struct sockaddr_in address;
-		std::memset(&address, 0, sizeof(address));
+	std::memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(config.getPort()); 
