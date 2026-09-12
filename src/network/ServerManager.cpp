@@ -1,6 +1,8 @@
 #include "../../includes/network/ServerManager.hpp"
 #include "../../includes/http/Request.hpp"
 #include "../../includes/http/Response.hpp"
+#include <netdb.h>
+#include <sstream>
 
 ServerManager::ServerManager() {}
 
@@ -42,32 +44,47 @@ void ServerManager::init(const std::vector<ServerConfig>& configs) {
 }
 
 void ServerManager::setupSocket(const ServerConfig& config) {
-    int serverFd = socket(AF_INET, SOCK_STREAM, 0);
+	std::ostringstream portStream;
+	portStream << config.getPort();
+
+	struct addrinfo hints;
+	struct addrinfo* addressInfo = NULL;
+	std::memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	int addressResult = getaddrinfo(config.getInterface().c_str(),
+									portStream.str().c_str(),
+									&hints, &addressInfo);
+	if (addressResult != 0)
+		throw std::runtime_error(gai_strerror(addressResult));
+
+	int serverFd = socket(addressInfo->ai_family, addressInfo->ai_socktype,
+						   addressInfo->ai_protocol);
     if (serverFd < 0) {
+		freeaddrinfo(addressInfo);
         throw std::runtime_error("Error: Failed to create Socket!");
     }
 
     int opt = 1;
     if (setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+		freeaddrinfo(addressInfo);
         close(serverFd);
         throw std::runtime_error("Erro no setsockopt (SO_REUSEADDR)");
     }
 
     if (fcntl(serverFd, F_SETFL, O_NONBLOCK) < 0) {
+		freeaddrinfo(addressInfo);
         close(serverFd);
         throw std::runtime_error("Erro to setup fcntl (O_NONBLOCK)");
     }
 
-    struct sockaddr_in address;
-	std::memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(config.getPort()); 
-
-    if (bind(serverFd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+	if (bind(serverFd, addressInfo->ai_addr, addressInfo->ai_addrlen) < 0) {
+		freeaddrinfo(addressInfo);
         close(serverFd);
         throw std::runtime_error("Error: on bind. Maybe address already in use.");
     }
+	freeaddrinfo(addressInfo);
 
     if (listen(serverFd, SOMAXCONN) < 0) {
         close(serverFd);
