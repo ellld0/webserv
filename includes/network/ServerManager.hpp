@@ -13,22 +13,27 @@
 #include <poll.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstring>
+#include <csignal>
+#include <ctime>
+#include <cstdlib>
+
 
 class ServerManager {
-private:
-    std::vector<struct pollfd> _pollFds;
-    std::map<int, ServerConfig> _serverSockets;
-	std::map<int, int> _clientToServer;
-	void setupSocket(const ServerConfig& config);
-public:
-    ServerManager();
-    ServerManager(const ServerManager& other);
-    ServerManager& operator=(const ServerManager& other);
-    ~ServerManager();
-
-    void init(const std::vector<ServerConfig>& configs);
-
-    void run();
+	private:
+		void setupSocket(const ServerConfig& config);
+		std::vector<struct pollfd> _pollFds;
+		std::map<int, Client> _clients;
+		std::map<int, ServerConfig> _serverSockets;
+		void closeFd(int active_fd, size_t &i);
+		size_t parseBodySize(const std::string& size_str);
+	public:
+		ServerManager();
+		ServerManager(const ServerManager& other);
+		ServerManager& operator=(const ServerManager& other);
+		~ServerManager();
+		void init(const std::vector<ServerConfig>& configs);
+		void run();
 };
 
 #endif
