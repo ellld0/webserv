@@ -4,8 +4,7 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 SRC_DIRS = src \
            src/config \
 		   src/network \
-		   src/http \
-		   src/utils
+		   src/http
 OBJ_DIR = obj/
 SRC = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.cpp))
 OBJ = $(patsubst src/%.cpp, $(OBJ_DIR)%.o, $(SRC))

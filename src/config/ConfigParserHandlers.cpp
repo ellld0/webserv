@@ -1,6 +1,7 @@
 #include "../../includes/config/ConfigParser.hpp"
 #include <stdexcept>
-#include "../../includes/utils/Utils.hpp"
+#include <cstdlib>
+#include <cctype>
 
 void ConfigParser::handleListen(ServerConfig& server, const std::vector<std::string>& tokens, size_t& i, bool& hasListen)
 {
@@ -26,7 +27,7 @@ void ConfigParser::handleListen(ServerConfig& server, const std::vector<std::str
         throw std::runtime_error("Error: invalid port '" + portString + "'.");
 
     server.setInterface(interfaceName);
-    server.setPort(ft_atoi(portString.c_str()));
+    server.setPort(std::atoi(portString.c_str()));
     hasListen = true;
     i += 3;
 }
@@ -51,11 +52,11 @@ void ConfigParser::handleErrorPage(ServerConfig& server, const std::vector<std::
 
     for (std::string::size_type j = 0; j < codeStr.size(); ++j)
     {
-        if (!ft_isdigit(codeStr[j]))
+        if (!std::isdigit(codeStr[j]))
             throw std::runtime_error("Error: error code must be numeric.");
     }
 
-    int errorCode = ft_atoi(codeStr.c_str());
+    int errorCode = std::atoi(codeStr.c_str());
     if (errorCode < 400 || errorCode > 599)
         throw std::runtime_error("Error: error code must be between 400 and 599.");
 
@@ -191,11 +192,11 @@ void ConfigParser::parseReturnDirective(LocationConfig& loc, const std::vector<s
 
     for (size_t j = 0; j < codeStr.size(); ++j)
     {
-        if (!ft_isdigit(codeStr[j]))
+        if (!std::isdigit(codeStr[j]))
             throw std::runtime_error("Error: redirect code must be numeric.");
     }
 
-    int redirCode = ft_atoi(codeStr.c_str());
+    int redirCode = std::atoi(codeStr.c_str());
     if (redirCode != 301 && redirCode != 302 && redirCode != 303 &&
         redirCode != 307 && redirCode != 308)
         throw std::runtime_error("Error: invalid redirect code.");

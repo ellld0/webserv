@@ -4,7 +4,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <vector>
-#include "../../includes/utils/Utils.hpp"
+#include <cstdlib>
+#include <cctype>
 
 
 ConfigParser::ConfigParser() {}
@@ -31,12 +32,12 @@ bool ConfigParser::isValidPort(const std::string& portString)
 
 	for (std::string::size_type i = 0; i < portString.size(); ++i)
 	{
-        if (!ft_isdigit(portString[i]))
+        if (!std::isdigit(portString[i]))
 		{
 			return false;
 		}
 	}
-        int port = ft_atoi(portString.c_str());
+        int port = std::atoi(portString.c_str());
 	if (port < 1 || port > 65535)
 	{
 		return false;
@@ -62,7 +63,7 @@ bool ConfigParser::isValidBodySize(const std::string& sizeString)
 
 	for(std::string::size_type i = 0; i < sizeString.size() - 1; ++i)
 	{
-        if(!ft_isdigit(sizeString[i]))
+        if(!std::isdigit(sizeString[i]))
 		{
 			return false;
 		}
