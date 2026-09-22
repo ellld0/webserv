@@ -4,6 +4,8 @@
 # include <string>
 # include <map>
 # include "../config/ServerConfig.hpp"
+# include "../config/LocationConfig.hpp"
+# include <iostream>
 
 class Request;
 
@@ -34,7 +36,7 @@ class Response
         bool        _loadFile(const std::string& path, std::string& out) const;
         bool        _writeFile(const std::string& path, const std::string& content) const;
 
-        std::string _resolveTargetPath(const Request& req) const;
+        std::string _resolveTargetPath(const Request& req, LocationConfig* location) const;
         std::string _reasonPhrase(int code) const;
         std::string _contentTypeFor(const std::string& path) const;
         std::string _httpDateNow() const;

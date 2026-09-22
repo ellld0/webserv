@@ -154,11 +154,11 @@ bool Response::_isCgiTarget(const std::string& path) const
     return (ext == "py" || ext == "php" || ext == "cgi" || ext == "sh");
 }
 
-std::string Response::_resolveTargetPath(const Request& req) const
+std::string Response::_resolveTargetPath(const Request& req, LocationConfig* location) const
 {
     std::string target = req.getPath();
     if (target == "/" || target.empty())
-        target = "/index.html";
+        target = "/" + location->getIndex();
     return target;
 }
 
@@ -319,7 +319,7 @@ void Response::_handleGet(const Request& req, const ServerConfig& config)
         return;
     }
     std::string root = location->getRoot();
-    std::string targetPath = _resolveTargetPath(req);
+    std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
 
     if(_isCgiTarget(fullPath))
@@ -355,7 +355,7 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     }
 
     std::string root = location->getRoot();
-    std::string targetPath = _resolveTargetPath(req);
+    std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
 
     if(_isCgiTarget(fullPath))
@@ -444,7 +444,7 @@ void Response::_handleDelete(const Request& req, const ServerConfig& config)
     else
     {
         std::string root = location->getRoot();
-        std::string targetPath = _resolveTargetPath(req);
+        std::string targetPath = _resolveTargetPath(req, location);
         fullPath = root + targetPath;
     }
 

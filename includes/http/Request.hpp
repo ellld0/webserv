@@ -1,6 +1,8 @@
 #ifndef REQUEST_HPP
 # define REQUEST_HPP
 
+# include "../config/ServerConfig.hpp"
+# include "../config/LocationConfig.hpp"
 # include <string>
 # include <map>
 # include <sstream>

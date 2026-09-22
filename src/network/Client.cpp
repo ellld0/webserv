@@ -16,7 +16,7 @@ Client& Client::operator=(const Client& other) {
         this->_requests = other._requests;
         this->_lastActivity = other._lastActivity;
     }
-    return *this; // Faltou isso!
+    return *this;
 }
 
 Client::~Client() {
