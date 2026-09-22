@@ -398,9 +398,15 @@ void Response::_handleDelete(const Request& req, const ServerConfig& config)
         return;
     }
 
-    std::string root = location->getRoot();
-    std::string targetPath = _resolveTargetPath(req);
-    std::string fullPath = root + targetPath;
+    std::string fullPath;
+    if (!location->getUploadPath().empty())
+        fullPath = location->getUploadPath() + "/upload.bin";
+    else
+    {
+        std::string root = location->getRoot();
+        std::string targetPath = _resolveTargetPath(req);
+        fullPath = root + targetPath;
+    }
 
     if (!_fileExists(fullPath))
     {
@@ -412,7 +418,7 @@ void Response::_handleDelete(const Request& req, const ServerConfig& config)
         _setStatus(403);
         return;
     }
-    _setStatus(200);
+    _setStatus(204);
     _body.clear();
 }
 
