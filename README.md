@@ -2,11 +2,11 @@
 
 # Webserv
 
-## Descrição
+## Description
 
-Webserv is an HTTP server written in C++98. The project provides a non-blocking server based on `poll()` and supports configurable listening ports, static files, HTTP methods, custom error pages, uploads, redirects, and CGI integration.
+Webserv is an HTTP server written in C++98. The project provides a non-blocking server based on poll() and supports configurable listening ports, static files, HTTP methods, custom error pages, uploads, redirects, and CGI integration.
 
-The configuration follows a structure inspired by the NGINX `server` and `location` blocks. Multiple server blocks can be declared in the same configuration file.
+The configuration follows a structure inspired by the NGINX server and location blocks. Multiple server blocks can be declared in the same configuration file.
 
 ### Configuration and parser
 
@@ -18,10 +18,10 @@ The configuration parser is responsible for:
 - Validating accepted methods: `GET`, `POST`, and `DELETE`.
 - Parsing client body limits, error pages, roots, index files, directory listing, uploads, and redirects.
 - Detecting duplicate directives and malformed configuration blocks.
-## Instruções
+
+## Instructions
 
 ### Requirements
-
 
 - A Unix-like operating system.
 - A C++ compiler with C++98 support.
@@ -92,17 +92,26 @@ server {
 
 The current sample configuration demonstrates multiple listening ports, static content, custom error pages, uploads, redirects, and per-location settings.
 
-## Recursos
+## Resources
 
 ### References
 
+Linux Manual (https://man7.org/index.html ) - To understand every syscall functions used is this project like poll(), send(), accept() and others. Also to understand struct data used via libraries like pollfd and sockaddr.
+
+CPP Reference (https://cppreference.com/) - To understand, discovery methods and features from native classes from C++98 utilized in project like std::map and std::vector. 
+
+IBM Documentation (https://www.ibm.com/docs/en/i/7.4.0?topic=designs-using-poll-instead-select) - How poll() works, why poll() between select() and the base of an webserver code.
+ 
+Youtube (https://www.youtube.com/watch?v=YwHErWJIh6Y&t=684s) - C++ Web Server from Scratch | Part 1: Creating a Socket Object by Eric O Meehan - Learn how to build an webserver in C++
+
+IETF Org (https://datatracker.ietf.org/doc/html/rfc3875) - To understand what CGI is and how it works.
 
 ### Use of artificial intelligence
 
 Artificial intelligence was used as a development and review assistant. It helped with:
  - Frontend construction
- - General doubts
- - 
+ - Research about how some functions works
+ - Spot potential errors
 
 The final design decisions, code integration, testing, and responsibility for the submitted implementation remain with the project team.
 
