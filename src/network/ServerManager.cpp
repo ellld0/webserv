@@ -154,6 +154,14 @@ void ServerManager::run() {
 							size_t limit = parseBodySize(_serverSockets[parent_server_fd].getClientMaxBodySize());
 							if (_clients[active_fd].getRequests().length() > limit) {
 								std::cout << "[NETWORK] Payload too big detected at Client FD: " << active_fd << std::endl;
+								std::string error_response = 
+									"HTTP/1.1 413 Payload Too Large\r\n"
+									"Content-Type: text/html\r\n"
+									"Connection: close\r\n"
+									"Content-Length: 55\r\n"
+									"\r\n"
+									"<html><body><h1>413 Payload Too Large</h1></body></html>";
+								send(active_fd, error_response.c_str(), error_response.length(), 0);
 								closeFd(active_fd, i);
 								continue;
 							}
@@ -189,7 +197,7 @@ void ServerManager::run() {
 							closeFd(active_fd, i);
 						}
 					}
-					else if (bytes_sent < 0) {
+					else if (bytes_sent <= 0) {
 						std::cout << "[NETWORK] Failed to sent response to FD: " << active_fd << std::endl;
 						closeFd(active_fd, i);
 					}
