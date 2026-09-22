@@ -367,7 +367,26 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     std::string uploadPath = location->getUploadPath();
     if(!uploadPath.empty())
     {
-        std::string fileName = uploadPath + "/upload.bin";
+        std::string fileName = req.getQueryString();
+        if(fileName.empty() || fileName.find("filename=") != 0)
+        {
+            _setStatus(400);
+            return;
+        }
+
+        fileName = fileName.substr(9);
+
+        if(fileName.empty() || 
+            fileName.find('/') != std::string::npos ||
+            fileName.find('\\') != std::string::npos ||
+            fileName.find("..") != std::string::npos)
+        {
+            _setStatus(400);
+            return;
+        }
+
+        fileName = uploadPath + "/" + fileName;
+
         if(!_writeFile(fileName, req.getBody()))
         {
             _setStatus(500);
@@ -400,7 +419,28 @@ void Response::_handleDelete(const Request& req, const ServerConfig& config)
 
     std::string fullPath;
     if (!location->getUploadPath().empty())
-        fullPath = location->getUploadPath() + "/upload.bin";
+    {
+        std::string fileName = req.getQueryString();
+        if (fileName.empty() ||
+            fileName.find("filename=") != 0)
+        {
+            _setStatus(400);
+            return;
+        }
+
+        fileName = fileName.substr(9);
+
+        if (fileName.empty() ||
+            fileName.find("..") != std::string::npos ||
+            fileName.find("/") != std::string::npos ||
+            fileName.find("\\") != std::string::npos)
+        {
+            _setStatus(400);
+            return;
+        }
+
+        fullPath = location->getUploadPath() + "/" + fileName;
+    }
     else
     {
         std::string root = location->getRoot();
