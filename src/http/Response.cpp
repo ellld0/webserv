@@ -544,7 +544,7 @@ void Response::build(const Request& req, const ServerConfig& config)
         return;
     }
 
-    if (method == "GET")
+    if (method == "GET" || method == "HEAD")
         _handleGet(req, config);
     else if (method == "POST")
         _handlePost(req, config);
