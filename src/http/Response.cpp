@@ -277,12 +277,12 @@ void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* loc
         return;
     }
 
-    /*if (!_fileExists(fullPath))
-    {
-        _setStatus(404);
-        return;
-    }*/
-
+	if (access(fullPath.c_str(), R_OK) != 0)
+	{
+		_setStatus(403); // Sem permissão = 403 Forbidden
+		return;
+	}
+	
     if (!_loadFile(fullPath, _body))
     {
         _setStatus(500);

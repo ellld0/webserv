@@ -8,6 +8,7 @@
 # include <iostream>
 # include <sys/stat.h>
 # include <dirent.h>
+# include <unistd.h>
 # include "CgiHandler.hpp"
 
 class Request;
