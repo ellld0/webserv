@@ -6,6 +6,8 @@
 # include "../config/ServerConfig.hpp"
 # include "../config/LocationConfig.hpp"
 # include <iostream>
+# include <sys/stat.h>
+# include <dirent.h>
 
 class Request;
 
@@ -26,9 +28,10 @@ class Response
         void        _handlePost(const Request& req, const ServerConfig& config);
         void        _handleDelete(const Request& req, const ServerConfig& config);
 
-        void        _serveStaticFile(const std::string& fullPath);
+        void        _serveStaticFile(const std::string& fullPath, LocationConfig* location, const Request& req);
         void        _handleCgi(const Request& req, const std::string& scriptPath);
         void        _parseCgiOutput(const std::string& rawOutput);
+		void		_generateDirectoryListing(const std::string& fullPath, const Request& req);
 
         void        _buildErrorResponse(const ServerConfig& config, int code);
 
