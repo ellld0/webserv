@@ -1,25 +1,33 @@
-#ifndef CGI_HANDLER_HPP
-# define CGI_HANDLER_HPP
+#ifndef CGIHANDLER_HPP
+#define CGIHANDLER_HPP
 
-# include <string>
-# include <vector>
+#include <string>
+#include <vector>
+#include <ctime>
+#include <sys/types.h>
+#include "../../includes/http/Request.hpp"
 
-class Request;
-class Response;
+struct CgiInfo {
+    int         readFd;     // parent reads the script output here
+    int         writeFd;    // parent writes the request body here (-1 when there is none)
+    pid_t       pid;
+    std::time_t start;
 
-class CgiHandler
-{
-    private:
-        std::string              _interpreterFor(const std::string& scriptPath) const;
-        std::vector<std::string> _buildEnvp(const Request& req, const std::string& scriptPath);
-        
-    public:
-        CgiHandler();
-        ~CgiHandler();
-        CgiHandler(const CgiHandler &other);
-        CgiHandler &operator=(const CgiHandler &other);
-        std::string execute(const Request& req, const std::string& scriptPath);
+    CgiInfo() : readFd(-1), writeFd(-1), pid(-1), start(0) {}
+};
 
+class CgiHandler {
+public:
+    CgiHandler();
+    ~CgiHandler();
+    CgiHandler(const CgiHandler &other);
+    CgiHandler &operator=(const CgiHandler &other);
+
+    CgiInfo startCgi(const Request& req, const std::string& scriptPath);
+
+private:
+    std::string _interpreterFor(const std::string& scriptPath) const;
+    std::vector<std::string> _buildEnvp(const Request& req, const std::string& scriptPath);
 };
 
 #endif

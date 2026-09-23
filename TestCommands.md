@@ -1,5 +1,8 @@
 # Commands to Test Web Serv
 
+## GET
+curl -i -X GET http://localhost:9080
+
 ## UPLOAD Test
 curl -i -X POST --data-binary @arquivo_teste.txt http://localhost:9080/uploads?filename=arquivo_teste.txt
 curl -i -X POST -d "12345" http://localhost:9080/uploads?filename=count.txt
@@ -27,3 +30,4 @@ curl -i -X POST -d "mensagem=isso_eh_um_post" "http://localhost:9080/cgi-bin/scr
 curl -i "http://localhost:9080/cgi-bin/error_script.py"
 
 ### Infinity Loop
+curl -i "http://localhost:9080/cgi-bin/infinity_loop.py"

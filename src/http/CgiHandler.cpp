@@ -1,5 +1,4 @@
 #include "../../includes/http/CgiHandler.hpp"
-#include "../../includes/http/Request.hpp"
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -58,7 +57,7 @@ std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::s
 	return env;
 }
 
-std::string CgiHandler::execute(const Request& req, const std::string& scriptPath)
+CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
 {
 	int inPipe[2];
 	int outPipe[2];
@@ -87,10 +86,30 @@ std::string CgiHandler::execute(const Request& req, const std::string& scriptPat
 		if (dup2(inPipe[0], STDIN_FILENO) < 0 || dup2(outPipe[1], STDOUT_FILENO) < 0)
 			_exit(1);
 
-		close(inPipe[0]);
-		close(inPipe[1]);
-		close(outPipe[0]);
-		close(outPipe[1]);
+		// The env must be built before chdir(): it carries the path as the
+		// server sees it, not as the script directory sees it.
+		std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
+		std::vector<char*> envp;
+		for (size_t i = 0; i < envStr.size(); ++i)
+			envp.push_back(const_cast<char*>(envStr[i].c_str()));
+		envp.push_back(NULL);
+
+		// Drop every descriptor inherited from the server: listening sockets,
+		// other clients and, above all, the pipes of other running CGIs. Keeping
+		// another script's stdin write end open would stop it from ever seeing EOF.
+		for (int fd = 3; fd < 1024; ++fd)
+			close(fd);
+
+		// Run from the script directory so relative paths inside it resolve.
+		std::string scriptName = scriptPath;
+		const std::string::size_type slash = scriptPath.find_last_of('/');
+		if (slash != std::string::npos)
+		{
+			const std::string dir = scriptPath.substr(0, slash);
+			if (chdir(dir.c_str()) < 0)
+				_exit(1);
+			scriptName = "./" + scriptPath.substr(slash + 1);
+		}
 
 		const std::string interpreter = _interpreterFor(scriptPath);
 		char *argv[3];
@@ -98,23 +117,17 @@ std::string CgiHandler::execute(const Request& req, const std::string& scriptPat
 		if (!interpreter.empty())
 		{
 			argv[0] = const_cast<char*>(interpreter.c_str());
-			argv[1] = const_cast<char*>(scriptPath.c_str());
+			argv[1] = const_cast<char*>(scriptName.c_str());
 			argv[2] = NULL;
 		}
 		else
 		{
-			argv[0] = const_cast<char*>(scriptPath.c_str());
+			argv[0] = const_cast<char*>(scriptName.c_str());
 			argv[1] = NULL;
 			argv[2] = NULL;
 		}
 
-		std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
-		std::vector<char*> envp;
-		for (size_t i = 0; i < envStr.size(); ++i)
-			envp.push_back(const_cast<char*>(envStr[i].c_str()));
-		envp.push_back(NULL);
-
-		const char* execPath = interpreter.empty() ? scriptPath.c_str() : interpreter.c_str();
+		const char* execPath = interpreter.empty() ? scriptName.c_str() : interpreter.c_str();
 		execve(execPath, argv, &envp[0]);
 		_exit(1);
 	}
@@ -122,77 +135,27 @@ std::string CgiHandler::execute(const Request& req, const std::string& scriptPat
 	close(inPipe[0]);
 	close(outPipe[1]);
 
-	if (req.getMethod() == "POST" && !req.getBody().empty())
-	{
-		const std::string& body = req.getBody();
-		ssize_t sent = 0;
-		while (sent < static_cast<ssize_t>(body.size()))
-		{
-			const ssize_t wrote = write(inPipe[1], body.c_str() + sent, body.size() - static_cast<size_t>(sent));
-			if (wrote <= 0)
-				break;
-			sent += wrote;
-		}
-	}
-	close(inPipe[1]);
-
 	int flags = fcntl(outPipe[0], F_GETFL, 0);
 	if (flags >= 0)
 		fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK);
 
-	std::string output;
-	char buffer[4096];
-	std::time_t start = std::time(NULL);
-	while (true)
+	CgiInfo info;
+	info.readFd = outPipe[0];
+	info.pid = pid;
+	info.start = std::time(NULL);
+
+	// The body is fed to the script by the main poll() loop. Writing it here
+	// would block the whole server as soon as it outgrows the pipe buffer.
+	if (req.getMethod() == "POST" && !req.getBody().empty())
 	{
-		int status = 0;
-		pid_t done = waitpid(pid, &status, WNOHANG);
-		if (done < 0)
-		{
-			close(outPipe[0]);
-			throw std::runtime_error("cgi: waitpid failed");
-		}
-		if (done == pid)
-		{
-			if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-			{
-				close(outPipe[0]);
-				throw std::runtime_error("cgi: script execution failed");
-			}
-			break;
-		}
-
-		pollfd pfd;
-		pfd.fd = outPipe[0];
-		pfd.events = POLLIN;
-		pfd.revents = 0;
-
-		int pollRes = poll(&pfd, 1, 100);
-		if (pollRes > 0 && (pfd.revents & POLLIN))
-		{
-			ssize_t bytes = read(outPipe[0], buffer, sizeof(buffer));
-			if (bytes > 0)
-				output.append(buffer, static_cast<std::string::size_type>(bytes));
-		}
-
-		if (std::time(NULL) - start >= 5)
-		{
-			kill(pid, SIGKILL);
-			waitpid(pid, NULL, 0);
-			close(outPipe[0]);
-			throw std::runtime_error("cgi: execution timeout");
-		}
+		flags = fcntl(inPipe[1], F_GETFL, 0);
+		if (flags >= 0)
+			fcntl(inPipe[1], F_SETFL, flags | O_NONBLOCK);
+		info.writeFd = inPipe[1];
 	}
+	else
+		close(inPipe[1]); // nothing to send: let the script see EOF right away
 
-	while (true)
-	{
-		ssize_t bytes = read(outPipe[0], buffer, sizeof(buffer));
-		if (bytes <= 0)
-			break;
-		output.append(buffer, static_cast<std::string::size_type>(bytes));
-	}
-
-	close(outPipe[0]);
-	return output;
+	return info;
 }
 
