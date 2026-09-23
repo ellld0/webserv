@@ -473,7 +473,7 @@ void Response::_buildErrorResponse(const ServerConfig& config, int code)
         return;
     }
 
-    if (code == 404 && _loadFile("www/404.html", _body))
+    if (code == 404 && _loadFile("www" + config.getErrorPage(404), _body))
     {
         _setHeader("Content-Type", "text/html");
         return;
@@ -511,6 +511,7 @@ void Response::build(const Request& req, const ServerConfig& config)
     _reset();
 
     const std::string method = req.getMethod();
+	std::cout << method << std::endl;
     const std::string path = req.getPath();
 
     if (!_isPathSafe(path))
