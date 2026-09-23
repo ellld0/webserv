@@ -159,6 +159,17 @@ bool Response::_isCgiTarget(const std::string& path) const
 std::string Response::_resolveTargetPath(const Request& req, LocationConfig* location) const
 {
     std::string target = req.getPath();
+    const std::string& locationPath = location->getPath();
+
+    if (locationPath != "/" && target.find(locationPath) == 0)
+    {
+        target = target.substr(locationPath.size());
+        if (target.empty())
+            target = "/";
+        else if (target[0] != '/')
+            target = "/" + target;
+    }
+
     if (target == "/" || target.empty())
         target = "/" + location->getIndex();
     return target;
@@ -168,6 +179,7 @@ LocationConfig* Response::_resolveLocation(const Request& req, const ServerConfi
 {
     const std::string& path = req.getPath();
     const std::vector<LocationConfig>& locations = config.getLocations();
+    LocationConfig* bestMatch = NULL;
 
     for (size_t i = 0; i < locations.size(); ++i)
     {
@@ -177,11 +189,24 @@ LocationConfig* Response::_resolveLocation(const Request& req, const ServerConfi
 
     for (size_t i = 0; i < locations.size(); ++i)
     {
-        if (locations[i].getPath() == "/")
-            return const_cast<LocationConfig*>(&locations[i]);
+        const std::string& locationPath = locations[i].getPath();
+        if (locationPath == "/")
+        {
+            if (bestMatch == NULL)
+                bestMatch = const_cast<LocationConfig*>(&locations[i]);
+            continue;
+        }
+
+        if (path.find(locationPath) == 0
+            && (locationPath[locationPath.size() - 1] == '/'
+                || path.size() == locationPath.size()
+                || path[locationPath.size()] == '/')
+            && (bestMatch == NULL
+                || locationPath.size() > bestMatch->getPath().size()))
+            bestMatch = const_cast<LocationConfig*>(&locations[i]);
     }
 
-    return NULL;
+    return bestMatch;
 }
 
 bool Response::_isMethodAllowed(const Request& req, const LocationConfig& location) const
@@ -211,6 +236,39 @@ void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* loc
 
 	if (S_ISDIR(path_stat.st_mode))
     {
+        std::string indexPath;
+        bool hasIndex = false;
+        if (!location->getIndex().empty())
+        {
+            indexPath = fullPath;
+            if (indexPath[indexPath.size() - 1] != '/')
+                indexPath += "/";
+            indexPath += location->getIndex();
+            std::ifstream indexFile(indexPath.c_str());
+            hasIndex = indexFile.good();
+        }
+
+        if (!hasIndex && !location->getDirectoryListing())
+        {
+            _setStatus(404);
+            return;
+        }
+
+        const std::string& requestPath = req.getPath();
+        if (requestPath.empty() || requestPath[requestPath.size() - 1] != '/')
+        {
+            _setStatus(301);
+            _setHeader("Location", requestPath + "/");
+            return;
+        }
+
+        if (hasIndex && _loadFile(indexPath, _body))
+        {
+            _setStatus(200);
+            _setHeader("Content-Type", _contentTypeFor(indexPath));
+            return;
+        }
+
 		if (!location->getDirectoryListing()) {
 			_setStatus(403);
         	return;
@@ -323,7 +381,6 @@ void Response::_finalizeHeaders()
 void Response::_handleGet(const Request& req, const ServerConfig& config)
 {
     LocationConfig* location = _resolveLocation(req, config);
-	std::cout << "Location: " << location->getPath() << std::endl;
     if(!location)
     {
         _setStatus(404);
