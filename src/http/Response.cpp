@@ -10,16 +10,13 @@
 #include <cstdlib>
 #include <algorithm>
 
-Response::Response() : _statusCode(200), _statusMessage("OK"), _headers(), _body() {}
+Response::Response() : _statusCode(200), _statusMessage("OK"), _headers(), _body(), _isCgi(false) {}
 
 Response::~Response() {}
 
 Response::Response(const Response &other)
 {
-    _statusCode = other._statusCode;
-    _statusMessage = other._statusMessage;
-    _headers = other._headers;
-    _body = other._body;
+    *this = other;
 }
 
 Response &Response::operator=(const Response &other)
@@ -30,6 +27,9 @@ Response &Response::operator=(const Response &other)
         _statusMessage = other._statusMessage;
         _headers = other._headers;
         _body = other._body;
+		_cgiState = other._cgiState;
+		_isCgi = other._isCgi;
+		_cgiRawOutput = other._cgiRawOutput;
     }
     return *this;
 }
@@ -69,6 +69,8 @@ std::string Response::_reasonPhrase(int code) const
         case 413: return "Payload Too Large";
         case 500: return "Internal Server Error";
         case 501: return "Not Implemented";
+        case 502: return "Bad Gateway";
+        case 504: return "Gateway Timeout";
         default:  return "Unknown";
     }
 }
@@ -296,15 +298,18 @@ void Response::_handleCgi(const Request& req, const std::string& scriptPath)
     CgiHandler cgi;
     try
     {
-        const std::string raw = cgi.execute(req, scriptPath);
-        _setStatus(200);
-        _parseCgiOutput(raw);
+        _cgiState = cgi.startCgi(req, scriptPath);
+        
+        _isCgi = true;
+        _cgiRawOutput.clear();
     }
     catch (...)
     {
+        _isCgi = false;
         _setStatus(500);
     }
 }
+
 void Response::_finalizeHeaders()
 {
     std::ostringstream lengthStream;
@@ -610,4 +615,27 @@ void Response::_generateDirectoryListing(const std::string& fullPath, const Requ
     {
         _setStatus(500);
     }
+}
+
+void Response::appendCgiOutput(const char* buf, size_t len)
+{
+    _cgiRawOutput.append(buf, len);
+}
+
+void Response::finalizeCgi()
+{
+    _setStatus(200);
+    _parseCgiOutput(_cgiRawOutput);
+    // build() already ran _finalizeHeaders() while the body was still empty,
+    // so Content-Length has to be recomputed now that the body is known.
+    _finalizeHeaders();
+}
+
+void Response::buildCgiError(const ServerConfig& config, int code)
+{
+    _reset();
+    _isCgi = false;
+    _cgiRawOutput.clear();
+    _buildErrorResponse(config, code);
+    _finalizeHeaders();
 }

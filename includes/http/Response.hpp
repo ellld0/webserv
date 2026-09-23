@@ -8,6 +8,7 @@
 # include <iostream>
 # include <sys/stat.h>
 # include <dirent.h>
+# include "CgiHandler.hpp"
 
 class Request;
 
@@ -18,6 +19,9 @@ class Response
         std::string                         _statusMessage;
         std::map<std::string, std::string>  _headers;
         std::string                         _body;
+		CgiInfo 							_cgiState;
+    	bool 								_isCgi;
+    	std::string 						_cgiRawOutput;
 
         void        _reset();
         void        _setStatus(int code);
@@ -51,15 +55,21 @@ class Response
 
         size_t      _parseBodySize(const std::string& sizeStr) const;
 
+
     public:
         Response();
         ~Response();
         Response(const Response &other);
         Response &operator=(const Response &other);
 
-        void build(const Request& req, const ServerConfig& config);
+        void 		build(const Request& req, const ServerConfig& config);
         std::string toString() const;
-        int getStatusCode() const;
+        int 		getStatusCode() const;
+		bool 		isCgi() const { return _isCgi; }
+    	CgiInfo 	getCgiState() const { return _cgiState; }
+		void 		appendCgiOutput(const char* buf, size_t len);
+    	void 		finalizeCgi();
+    	void 		buildCgiError(const ServerConfig& config, int code);
 };
 
 #endif

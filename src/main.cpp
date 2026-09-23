@@ -23,6 +23,10 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	
+	// Writing to a pipe whose script already died, or to a socket the client
+	// closed, must return -1 instead of killing the server.
+	signal(SIGPIPE, SIG_IGN);
+
 	try {
 		std::cout << "[INFO] Reading config file..." << std::endl;
 		ConfigParser parser;

@@ -3,6 +3,8 @@
 
 #include <ctime>
 #include <string>
+#include "../http/CgiHandler.hpp"
+#include "../http/Response.hpp"
 
 class Client {
 	public:
@@ -17,6 +19,14 @@ class Client {
 		std::string getResponses() const;
 		std::string getRequests() const;
 		time_t		getLastActivity() const;
+		CgiInfo		getCgiState() const { return _cgiState; }
+		void 		setCgiState(const CgiInfo& cgiState) { _cgiState = cgiState; }
+		void 		setResponseObj(const Response& res);
+		Response& 	getResponseObj();
+
+		const std::string&	getCgiBody() const;
+		void				setCgiBody(const std::string& body);
+		void				trimCgiBody(size_t bytes_sent);
 
 		void appendResponse(std::string response);
 		void appendRequest(std::string request);
@@ -29,6 +39,9 @@ class Client {
 		std::string	_responses;
 		std::string	_requests;
 		time_t		_lastActivity;
+		CgiInfo		_cgiState;
+		Response	_responseObj;
+		std::string	_cgiBody;
 };
 
 #endif

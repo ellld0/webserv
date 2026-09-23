@@ -99,7 +99,11 @@ void ServerManager::run() {
 			std::cout << "[ERROR] poll() failed." << std::endl;
 			break;
 		}
-		else if (0 == poll_count) {
+		// Runaway scripts have to be reaped on every turn, not only when the
+		// server happens to be idle.
+		checkCgiTimeouts();
+
+		if (0 == poll_count) {
 			std::cout << "[DEBUG] Idle Server, checking for dead clients..." << std::endl;
 			// Future clean dead client function
 			time_t now = std::time(NULL);
@@ -108,18 +112,39 @@ void ServerManager::run() {
 				if (_serverSockets.count(fd) > 0)
 					continue;
 				if (_clients.count(fd) > 0) {
-					if (now - _clients[fd].getLastActivity() > 30) { 
+					if (cgiFdForClient(fd) >= 0)
+						continue; // waiting on its own CGI, not idle
+					if (!_clients[fd].getResponses().empty())
+						continue; // answer already queued, it is not idle either
+					if (now - _clients[fd].getLastActivity() > 30) {
 						std::cout << "[NETWORK] Client from FD " << fd << " is inactive." << std::endl;
 						closeFd(fd, i);
 					}
 				}
 			}
-			continue; 
+			continue;
 		}
 		else {
 			for (size_t i = 0; i < _pollFds.size(); i++) {
-				if (_pollFds[i].revents & POLLIN) {
-					int active_fd = _pollFds[i].fd;
+				const short revents = _pollFds[i].revents;
+				const int active_fd = _pollFds[i].fd;
+
+				if (revents == 0)
+					continue;
+
+				// CGI pipes are checked first: once the script exited and its
+				// output was drained, the read end reports POLLHUP *without*
+				// POLLIN, and that is the only notice we get that it is over.
+				if (_cgiToClientMap.count(active_fd) > 0) {
+					handleCgiRead(i, revents);
+					continue;
+				}
+				if (_cgiWriteToClientMap.count(active_fd) > 0) {
+					handleCgiWrite(i, revents);
+					continue;
+				}
+
+				if (revents & (POLLIN | POLLHUP | POLLERR)) {
 					if (_serverSockets.count(active_fd) > 0) {
 						std::cout << "[NETWORK] New client! AT SERVER FD: " << active_fd << ")" << std::endl;
 						struct sockaddr_in client_addr;
@@ -173,8 +198,35 @@ void ServerManager::run() {
 							ServerConfig current_config = _serverSockets[parent_server_fd];
                             Response client_response;
                             client_response.build(client_request, current_config);
+							if (client_response.isCgi()) {
+								CgiInfo cgi_state = client_response.getCgiState();
+								_clients[active_fd].setCgiState(cgi_state);
+								_clients[active_fd].setResponseObj(client_response);
+								_clients[active_fd].setCgiBody(client_request.getBody());
+
+								struct pollfd cgi_pollfd;
+								cgi_pollfd.fd = cgi_state.readFd;
+								cgi_pollfd.events = POLLIN;
+								cgi_pollfd.revents = 0;
+								_pollFds.push_back(cgi_pollfd);
+								_cgiToClientMap[cgi_state.readFd] = active_fd;
+
+								// The body is fed to the script through poll() too,
+								// so a script that never reads stdin cannot block us.
+								if (cgi_state.writeFd >= 0) {
+									struct pollfd cgi_in_pollfd;
+									cgi_in_pollfd.fd = cgi_state.writeFd;
+									cgi_in_pollfd.events = POLLOUT;
+									cgi_in_pollfd.revents = 0;
+									_pollFds.push_back(cgi_in_pollfd);
+									_cgiWriteToClientMap[cgi_state.writeFd] = active_fd;
+								}
+								_pollFds[i].events = 0;
+							}
+							else {
 							_clients[active_fd].appendResponse(client_response.toString());
 							_pollFds[i].events = POLLOUT;
+							}
 						}
 						else if (bytes_read == 0) {
 							std::cout << "[NETWORK] Client disconnected from FD: " << active_fd << std::endl;
@@ -186,8 +238,7 @@ void ServerManager::run() {
 						}
 					}
 				}
-				else if (_pollFds[i].revents & POLLOUT) {
-					int	active_fd = _pollFds[i].fd;
+				else if (revents & POLLOUT) {
 					std::string response_str = _clients[active_fd].getResponses();
 					int bytes_sent = send(active_fd, response_str.c_str(), response_str.length(), 0);
 					if (bytes_sent > 0) {
@@ -209,10 +260,185 @@ void ServerManager::run() {
 
 void ServerManager::closeFd(int active_fd, size_t &i) {
 	std::cout << "[NETWORK] Closing connection on FD: " << active_fd << std::endl;
+
+	// A client may go away while its script is still running: kill the script
+	// instead of leaving an orphan pipe polling forever on a dead client.
+	if (cgiFdForClient(active_fd) >= 0)
+		killCgi(active_fd, i);
+
 	close(active_fd);
 	_clients.erase(active_fd);
-	_pollFds.erase(_pollFds.begin() + i);
-	i--;
+	removePollFd(active_fd, i);
+}
+
+// Removes fd from the poll set, keeping the caller's loop index consistent.
+void ServerManager::removePollFd(int fd, size_t &i) {
+	for (size_t j = 0; j < _pollFds.size(); ++j) {
+		if (_pollFds[j].fd == fd) {
+			_pollFds.erase(_pollFds.begin() + j);
+			if (j <= i)
+				i--;
+			return;
+		}
+	}
+}
+
+void ServerManager::setClientWritable(int client_fd) {
+	for (size_t j = 0; j < _pollFds.size(); ++j) {
+		if (_pollFds[j].fd == client_fd) {
+			_pollFds[j].events = POLLOUT;
+			return;
+		}
+	}
+}
+
+int ServerManager::cgiFdForClient(int client_fd) const {
+	for (std::map<int, int>::const_iterator it = _cgiToClientMap.begin(); it != _cgiToClientMap.end(); ++it) {
+		if (it->second == client_fd)
+			return it->first;
+	}
+	return -1;
+}
+
+// Drains the script output. On a non-blocking pipe read() < 0 only means
+// "nothing right now", so EOF is what read() == 0 reports - or, when the buffer
+// is already empty, the POLLHUP that poll() raises on a hung up pipe.
+void ServerManager::handleCgiRead(size_t &i, short revents) {
+	const int	cgi_fd = _pollFds[i].fd;
+	const int	client_fd = _cgiToClientMap[cgi_fd];
+	char		buffer[4096];
+	bool		eof = false;
+
+	if (_clients.count(client_fd) == 0) {
+		close(cgi_fd);
+		_cgiToClientMap.erase(cgi_fd);
+		removePollFd(cgi_fd, i);
+		return;
+	}
+
+	while (true) {
+		int bytes_read = read(cgi_fd, buffer, sizeof(buffer));
+		if (bytes_read > 0) {
+			_clients[client_fd].getResponseObj().appendCgiOutput(buffer, bytes_read);
+			continue;
+		}
+		if (bytes_read == 0)
+			eof = true;
+		break;
+	}
+
+	if (!eof && (revents & (POLLHUP | POLLERR | POLLNVAL)))
+		eof = true;
+	if (eof)
+		finishCgi(cgi_fd, client_fd, i);
+}
+
+// Feeds the request body to the script's stdin, one poll() turn at a time.
+void ServerManager::handleCgiWrite(size_t &i, short revents) {
+	const int	write_fd = _pollFds[i].fd;
+	const int	client_fd = _cgiWriteToClientMap[write_fd];
+
+	if (_clients.count(client_fd) == 0 || (revents & (POLLERR | POLLHUP | POLLNVAL))) {
+		close(write_fd);
+		_cgiWriteToClientMap.erase(write_fd);
+		removePollFd(write_fd, i);
+		return;
+	}
+
+	const std::string& body = _clients[client_fd].getCgiBody();
+	int bytes_written = write(write_fd, body.c_str(), body.size());
+
+	if (bytes_written > 0)
+		_clients[client_fd].trimCgiBody(bytes_written);
+	if (bytes_written < 0 || _clients[client_fd].getCgiBody().empty()) {
+		// Closing is what gives the script EOF on stdin.
+		close(write_fd);
+		_cgiWriteToClientMap.erase(write_fd);
+		removePollFd(write_fd, i);
+	}
+}
+
+// The script is done: reap it, turn its output into the response and hand the
+// client back to the poll loop as writable.
+void ServerManager::finishCgi(int cgi_fd, int client_fd, size_t &i) {
+	int status = 0;
+
+	std::cout << "[CGI] Finished for Client FD: " << client_fd << std::endl;
+	waitpid(_clients[client_fd].getCgiState().pid, &status, 0);
+
+	Response& response = _clients[client_fd].getResponseObj();
+	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+		std::cout << "[CGI] Script failed for Client FD: " << client_fd << std::endl;
+		response.buildCgiError(_serverSockets[_clients[client_fd].getServerFd()], 502);
+	}
+	else
+		response.finalizeCgi();
+
+	_clients[client_fd].appendResponse(response.toString());
+	setClientWritable(client_fd);
+
+	close(cgi_fd);
+	_cgiToClientMap.erase(cgi_fd);
+	removePollFd(cgi_fd, i);
+
+	// The stdin pipe may still be open if the script exited without reading it.
+	const int write_fd = _clients[client_fd].getCgiState().writeFd;
+	if (write_fd >= 0 && _cgiWriteToClientMap.count(write_fd) > 0) {
+		close(write_fd);
+		_cgiWriteToClientMap.erase(write_fd);
+		removePollFd(write_fd, i);
+	}
+}
+
+// Kills a running script and drops both of its pipes, without answering the
+// client (used when the client itself is going away).
+void ServerManager::killCgi(int client_fd, size_t &i) {
+	const int	cgi_fd = cgiFdForClient(client_fd);
+	const pid_t	pid = _clients[client_fd].getCgiState().pid;
+	const int	write_fd = _clients[client_fd].getCgiState().writeFd;
+
+	if (pid > 0) {
+		kill(pid, SIGKILL);
+		waitpid(pid, NULL, 0);
+	}
+	if (cgi_fd >= 0) {
+		close(cgi_fd);
+		_cgiToClientMap.erase(cgi_fd);
+		removePollFd(cgi_fd, i);
+	}
+	if (write_fd >= 0 && _cgiWriteToClientMap.count(write_fd) > 0) {
+		close(write_fd);
+		_cgiWriteToClientMap.erase(write_fd);
+		removePollFd(write_fd, i);
+	}
+}
+
+// Scripts that never finish (www/cgi-bin/infinity_loop.py) are killed and the
+// client gets a 504 instead of waiting forever.
+void ServerManager::checkCgiTimeouts() {
+	const time_t		now = std::time(NULL);
+	std::vector<int>	expired;
+
+	for (std::map<int, int>::iterator it = _cgiToClientMap.begin(); it != _cgiToClientMap.end(); ++it) {
+		const int client_fd = it->second;
+		if (_clients.count(client_fd) == 0)
+			continue;
+		if (now - _clients[client_fd].getCgiState().start > CGI_TIMEOUT)
+			expired.push_back(client_fd);
+	}
+
+	for (size_t k = 0; k < expired.size(); ++k) {
+		const int	client_fd = expired[k];
+		size_t		dummy = _pollFds.size();
+
+		std::cout << "[CGI] Timeout, killing script for Client FD: " << client_fd << std::endl;
+		killCgi(client_fd, dummy);
+
+		Response& response = _clients[client_fd].getResponseObj();
+		response.buildCgiError(_serverSockets[_clients[client_fd].getServerFd()], 504);
+		_clients[client_fd].appendResponse(response.toString());
+		setClientWritable(client_fd);
+	}
 }
 
 
