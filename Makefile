@@ -13,7 +13,7 @@ all: $(NAME)
 
 $(NAME): $(OBJ)
 	$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
-	@chmod +x www/*.py
+	@chmod +x www/cgi-bin/*.py
 
 $(OBJ_DIR)%.o: src/%.cpp
 	mkdir -p $(dir $@)

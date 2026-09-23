@@ -197,13 +197,31 @@ bool Response::_isMethodAllowed(const Request& req, const LocationConfig& locati
 }
 
 
-void Response::_serveStaticFile(const std::string& fullPath)
+void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* location, const Request& req)
 {
-    if (!_fileExists(fullPath))
+	struct stat path_stat;
+	
+	if (stat(fullPath.c_str(), &path_stat) != 0)
     {
         _setStatus(404);
         return;
     }
+
+	if (S_ISDIR(path_stat.st_mode))
+    {
+		if (!location->getDirectoryListing()) {
+			_setStatus(403);
+        	return;
+		}
+        _generateDirectoryListing(fullPath, req);
+        return;
+    }
+
+    /*if (!_fileExists(fullPath))
+    {
+        _setStatus(404);
+        return;
+    }*/
 
     if (!_loadFile(fullPath, _body))
     {
@@ -300,7 +318,7 @@ void Response::_finalizeHeaders()
 void Response::_handleGet(const Request& req, const ServerConfig& config)
 {
     LocationConfig* location = _resolveLocation(req, config);
-
+	std::cout << "Location: " << location->getPath() << std::endl;
     if(!location)
     {
         _setStatus(404);
@@ -321,20 +339,20 @@ void Response::_handleGet(const Request& req, const ServerConfig& config)
     std::string root = location->getRoot();
     std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
-
+	std::cout << "FullPath: " << fullPath << std::endl;
     if(_isCgiTarget(fullPath))
     {
         _handleCgi(req, fullPath);
         return;
     }
     
-    _serveStaticFile(fullPath);
+    _serveStaticFile(fullPath, location, req);
 }
 
 void Response::_handlePost(const Request& req, const ServerConfig& config)
 {
     LocationConfig* location = _resolveLocation(req, config);
-
+	std::cout << "Location: " << (location ? location->getPath() : "NULL") << std::endl;
     if(!location)
     {
         _setStatus(404);
@@ -368,6 +386,7 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     if(!uploadPath.empty())
     {
         std::string fileName = req.getQueryString();
+		std::cout << "Filename: " << fileName << std::endl;
         if(fileName.empty() || fileName.find("filename=") != 0)
         {
             _setStatus(400);
@@ -511,7 +530,6 @@ void Response::build(const Request& req, const ServerConfig& config)
     _reset();
 
     const std::string method = req.getMethod();
-	std::cout << method << std::endl;
     const std::string path = req.getPath();
 
     if (!_isPathSafe(path))
@@ -556,4 +574,40 @@ std::string Response::toString() const
 int Response::getStatusCode() const
 {
     return _statusCode;
+}
+
+void Response::_generateDirectoryListing(const std::string& fullPath, const Request& req)
+{
+    DIR *dir;
+    struct dirent *ent;
+    
+    if ((dir = opendir(fullPath.c_str())) != NULL)
+    {
+        std::string reqPath = req.getPath();        
+        if (!reqPath.empty() && reqPath[reqPath.length() - 1] != '/') {
+            reqPath += "/";
+        }
+        std::string html = "<html><head><title>Index of " + reqPath + "</title></head><body>";
+        html += "<h1>Index of " + reqPath + "</h1><hr><ul>";
+
+        while ((ent = readdir(dir)) != NULL)
+        {
+            std::string filename = ent->d_name;
+            
+            if (filename == ".") continue; 
+
+            html += "<li><a href=\"" + reqPath + filename + "\">" + filename + "</a></li>";
+        }
+        closedir(dir);
+        
+        html += "</ul><hr></body></html>";
+
+        _body = html;
+        _setStatus(200);
+        _setHeader("Content-Type", "text/html");
+    }
+    else
+    {
+        _setStatus(500);
+    }
 }
