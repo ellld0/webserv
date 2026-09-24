@@ -166,8 +166,6 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath, 
     if (tmpFd < 0)
         throw std::runtime_error("cgi: tmp file failed");
 
-    std::remove(tmp_name.c_str());
-
     const std::string& body = req.getBody();
     if (req.getMethod() == "POST" && !body.empty()) {
         size_t written = 0;
@@ -177,8 +175,15 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath, 
                 break;
             written += n;
         }
-        lseek(tmpFd, 0, SEEK_SET);
+        int readFd = open(tmp_name.c_str(), O_RDONLY);
+        if (readFd < 0) {
+            close(tmpFd);
+            throw std::runtime_error("cgi: input file reopen failed");
+        }
+        close(tmpFd);
+        tmpFd = readFd;
     }
+    std::remove(tmp_name.c_str());
 
     const pid_t pid = fork();
     if (pid < 0) {
@@ -214,7 +219,6 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath, 
 
         execve(exe.c_str(), argv, &envp[0]);
         
-        throw std::runtime_error("cgi: execve failed");
         throw std::runtime_error("cgi: execve failed");
     }
 
