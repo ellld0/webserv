@@ -209,6 +209,30 @@ LocationConfig* Response::_resolveLocation(const Request& req, const ServerConfi
     return bestMatch;
 }
 
+// Finds an extension location ("*.bla") matching the request path that has a
+// cgi_pass and accepts the request method. Such locations never match by
+// prefix in _resolveLocation(), so they only decide *how* a file is served.
+LocationConfig* Response::_findCgiLocation(const Request& req, const ServerConfig& config) const
+{
+    const std::string& path = req.getPath();
+    const std::vector<LocationConfig>& locations = config.getLocations();
+
+    for (size_t i = 0; i < locations.size(); ++i)
+    {
+        const std::string& locationPath = locations[i].getPath();
+        if (locationPath.size() < 3 || locationPath[0] != '*' || locationPath[1] != '.')
+            continue;
+        const std::string ext = locationPath.substr(1);
+        if (path.size() <= ext.size()
+            || path.compare(path.size() - ext.size(), ext.size(), ext) != 0)
+            continue;
+        if (locations[i].getCgiPass().empty() || !_isMethodAllowed(req, locations[i]))
+            continue;
+        return const_cast<LocationConfig*>(&locations[i]);
+    }
+    return NULL;
+}
+
 bool Response::_isMethodAllowed(const Request& req, const LocationConfig& location) const
 {
     const std::string& method = req.getMethod();
@@ -293,27 +317,32 @@ void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* loc
     _setHeader("Content-Type", _contentTypeFor(fullPath));
 }
 
-void Response::_parseCgiOutput(const std::string& rawOutput)
+// Splits _cgiRawOutput into headers and body. The body is moved (erase + swap)
+// instead of copied: CGI answers can be 100MB.
+void Response::_parseCgiOutput()
 {
-    std::string::size_type sep = rawOutput.find("\r\n\r\n");
+    std::string::size_type sep = _cgiRawOutput.find("\r\n\r\n");
     std::string separator = "\r\n\r\n";
 
     if (sep == std::string::npos)
     {
-        sep = rawOutput.find("\n\n");
+        sep = _cgiRawOutput.find("\n\n");
         separator = "\n\n";
     }
 
     if (sep == std::string::npos)
     {
-        _body = rawOutput;
+        _body.swap(_cgiRawOutput);
+        std::string().swap(_cgiRawOutput);
         if (_headers.find("Content-Type") == _headers.end())
             _setHeader("Content-Type", "text/html");
         return;
     }
 
-    const std::string rawHeaders = rawOutput.substr(0, sep);
-    _body = rawOutput.substr(sep + separator.size());
+    const std::string rawHeaders = _cgiRawOutput.substr(0, sep);
+    _cgiRawOutput.erase(0, sep + separator.size());
+    _body.swap(_cgiRawOutput);
+    std::string().swap(_cgiRawOutput);
 
     std::istringstream hs(rawHeaders);
     std::string line;
@@ -351,12 +380,12 @@ void Response::_parseCgiOutput(const std::string& rawOutput)
         _setHeader("Content-Type", "text/html");
 }
 
-void Response::_handleCgi(const Request& req, const std::string& scriptPath)
+void Response::_handleCgi(const Request& req, const std::string& scriptPath, const std::string& interpreter)
 {
     CgiHandler cgi;
     try
     {
-        _cgiState = cgi.startCgi(req, scriptPath);
+        _cgiState = cgi.startCgi(req, scriptPath, interpreter);
         
         _isCgi = true;
         _cgiRawOutput.clear();
@@ -401,7 +430,12 @@ void Response::_handleGet(const Request& req, const ServerConfig& config)
     std::string root = location->getRoot();
     std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
-	std::cout << "FullPath: " << fullPath << std::endl;
+    LocationConfig* cgiLocation = _findCgiLocation(req, config);
+    if(cgiLocation)
+    {
+        _handleCgi(req, fullPath, cgiLocation->getCgiPass());
+        return;
+    }
     if(_isCgiTarget(fullPath))
     {
         _handleCgi(req, fullPath);
@@ -411,92 +445,9 @@ void Response::_handleGet(const Request& req, const ServerConfig& config)
     _serveStaticFile(fullPath, location, req);
 }
 
-/*void Response::_handlePost(const Request& req, const ServerConfig& config)
-{	
-    LocationConfig* location = _resolveLocation(req, config);
-	std::cout << "Location: " << (location ? location->getPath() : "NULL") << std::endl;
-    if(!location)
-    {
-        _setStatus(404);
-        return;
-    }
-    if(!_isMethodAllowed(req, *location))
-    {
-        _setStatus(405);
-        return;
-    }
-    std::string maxBodySize = config.getClientMaxBodySize();
-    size_t maxBytes = _parseBodySize(maxBodySize);
-
-    if(req.getBody().size() > maxBytes)
-    {
-        _setStatus(413);
-        return;
-    }
-
-	std::string path = req.getPath();
-	std::string ext = ".bla";
-	if (path.length() >= ext.length() && 
-    path.substr(path.length() - ext.length()) == ext) 
-	{
-		_handleCgi(req, "./cgi_tester");
-	}
-
-    std::string root = location->getRoot();
-    std::string targetPath = _resolveTargetPath(req, location);
-    std::string fullPath = root + targetPath;
-
-    if(_isCgiTarget(fullPath))
-    {
-        _handleCgi(req, fullPath);
-        return;
-    }
-
-    std::string uploadPath = location->getUploadPath();
-    if(!uploadPath.empty())
-    {
-        std::string fileName = req.getQueryString();
-		std::cout << "Filename: " << fileName << std::endl;
-        if(fileName.empty() || fileName.find("filename=") != 0)
-        {
-            _setStatus(400);
-            return;
-        }
-
-        fileName = fileName.substr(9);
-
-        if(fileName.empty() || 
-            fileName.find('/') != std::string::npos ||
-            fileName.find('\\') != std::string::npos ||
-            fileName.find("..") != std::string::npos)
-        {
-            _setStatus(400);
-            return;
-        }
-
-        fileName = uploadPath + "/" + fileName;
-
-        if(!_writeFile(fileName, req.getBody()))
-        {
-            _setStatus(500);
-            return;
-        }
-
-        _setStatus(201);
-        _body = "File uploaded successfully.\n";
-        _setHeader("Content-Type", "text/plain");
-    }
-    else
-    {
-        _setStatus(405);
-    }
-}*/
-
 void Response::_handlePost(const Request& req, const ServerConfig& config)
 {   
     LocationConfig* location = _resolveLocation(req, config);
-    std::cout << "Location: " << (location ? location->getPath() : "NULL") << std::endl;
-    
     if(!location)
     {
         _setStatus(404);
@@ -509,47 +460,28 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
         return;
     }
 
-    // ==========================================================
-    // INTERCEPTADOR DO TESTER: Rota /post_body
-    // ==========================================================
-    if (req.getPath() == "/post_body") 
-    {
-        // O tester exige limite de 100 bytes especificamente para esta rota
-        if (req.getBody().size() > 100) {
-            _setStatus(413); // Payload Too Large
-            return;
-        }
-
-        // Se for até 100 bytes, devolve 200 OK genérico como o Tester pede
-        _setStatus(200);
-        _setHeader("Content-Type", "text/plain");
-        _body = "POST recebido pelo tester com sucesso!\n";
-        return;
-    }
-    // ==========================================================
-
-    // Limite global para as outras rotas
-    std::string maxBodySize = config.getClientMaxBodySize();
-    size_t maxBytes = _parseBodySize(maxBodySize);
-
-    if(req.getBody().size() > maxBytes)
+    // A location may set its own client_max_body_size (e.g. /post_body 100),
+    // otherwise the server one applies.
+    std::string maxBodySize = location->getClientMaxBodySize();
+    if (maxBodySize.empty())
+        maxBodySize = config.getClientMaxBodySize();
+    if(req.getBody().size() > ServerConfig::parseBodySize(maxBodySize))
     {
         _setStatus(413);
         return;
     }
 
-    std::string path = req.getPath();
-    std::string ext = ".bla";
-    if (path.length() >= ext.length() && 
-    path.substr(path.length() - ext.length()) == ext) 
-    {
-        _handleCgi(req, "./cgi_tester");
-        return; // IMPORTANTE: faltava esse return no seu código original!
-    }
-
     std::string root = location->getRoot();
     std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
+
+    // Extension locations ("location *.bla { cgi_pass ./cgi_tester; }")
+    LocationConfig* cgiLocation = _findCgiLocation(req, config);
+    if(cgiLocation)
+    {
+        _handleCgi(req, fullPath, cgiLocation->getCgiPass());
+        return;
+    }
 
     if(_isCgiTarget(fullPath))
     {
@@ -561,7 +493,6 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     if(!uploadPath.empty())
     {
         std::string fileName = req.getQueryString();
-        std::cout << "Filename: " << fileName << std::endl;
         if(fileName.empty() || fileName.find("filename=") != 0)
         {
             _setStatus(400);
@@ -593,7 +524,11 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     }
     else
     {
-        _setStatus(405);
+        // POST is allowed here but there is nothing to run or store: just
+        // acknowledge it (the tester's /post_body expects any answer).
+        _setStatus(200);
+        _body = "POST received.\n";
+        _setHeader("Content-Type", "text/plain");
     }
 }
 
@@ -682,25 +617,6 @@ void Response::_buildErrorResponse(const ServerConfig& config, int code)
     _setHeader("Content-Type", "text/html");
 }
 
-size_t Response::_parseBodySize(const std::string& sizeStr) const
-{
-    if (sizeStr.empty())
-        return 1024UL * 1024UL; // 1MB default
-
-    char lastChar = sizeStr[sizeStr.size() - 1];
-    std::string numPart = sizeStr.substr(0, sizeStr.size() - 1);
-    size_t base = static_cast<size_t>(std::atol(numPart.c_str()));
-
-    if (lastChar == 'K')
-        return base * 1024UL;
-    if (lastChar == 'M')
-        return base * 1024UL * 1024UL;
-    if (lastChar == 'G')
-        return base * 1024UL * 1024UL * 1024UL;
-
-    return base;
-}
-
 void Response::build(const Request& req, const ServerConfig& config)
 {
     _reset();
@@ -743,8 +659,20 @@ std::string Response::toString() const
     }
 
     ss << "\r\n";
-    ss << _body;
-    return ss.str();
+
+    // Appending the body directly avoids streaming (and regrowing) a copy of
+    // it inside the ostringstream, which matters for 100MB CGI answers.
+    std::string out = ss.str();
+    out.reserve(out.size() + _body.size());
+    out += _body;
+    return out;
+}
+
+// Frees the (possibly huge) body once it was serialized with toString().
+void Response::releaseBody()
+{
+    std::string().swap(_body);
+    std::string().swap(_cgiRawOutput);
 }
 
 int Response::getStatusCode() const
@@ -796,7 +724,7 @@ void Response::appendCgiOutput(const char* buf, size_t len)
 void Response::finalizeCgi()
 {
     _setStatus(200);
-    _parseCgiOutput(_cgiRawOutput);
+    _parseCgiOutput();
     // build() already ran _finalizeHeaders() while the body was still empty,
     // so Content-Length has to be recomputed now that the body is known.
     _finalizeHeaders();

@@ -32,7 +32,7 @@ class ServerManager {
 
 		void	setupSocket(const ServerConfig& config);
 		void	closeFd(int active_fd, size_t &i);
-		size_t	parseBodySize(const std::string& size_str);
+		static bool	requestLooksComplete(const std::string& raw);
 
 		void	handleCgiRead(size_t &i, short revents);
 		void	handleCgiWrite(size_t &i, short revents);

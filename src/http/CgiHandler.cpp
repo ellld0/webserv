@@ -46,54 +46,6 @@ std::string CgiHandler::_interpreterFor(const std::string& scriptPath) const
 	return "";
 }
 
-/*std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::string& scriptPath)
-{
-    std::vector<std::string> env;
-
-    // 1. Limpamos o PATH (Remove o \r se existir)
-    std::string cleanPath = req.getPath();
-    if (!cleanPath.empty() && cleanPath[cleanPath.length() - 1] == '\r')
-        cleanPath.erase(cleanPath.length() - 1);
-
-    // 2. Limpamos a Query String
-    std::string cleanQuery = req.getQueryString();
-    if (!cleanQuery.empty() && cleanQuery[cleanQuery.length() - 1] == '\r')
-        cleanQuery.erase(cleanQuery.length() - 1);
-
-    // 3. Limpamos os Headers críticos
-    std::string cType = req.getHeader("Content-Type");
-    if (!cType.empty() && cType[cType.length() - 1] == '\r')
-        cType.erase(cType.length() - 1);
-
-    std::string cLen = req.getHeader("Content-Length");
-    if (!cLen.empty() && cLen[cLen.length() - 1] == '\r')
-        cLen.erase(cLen.length() - 1);
-
-    // Montando o Env Oficial
-    env.push_back("GATEWAY_INTERFACE=CGI/1.1");
-    env.push_back("SERVER_PROTOCOL=HTTP/1.1");
-    env.push_back("REQUEST_METHOD=" + req.getMethod());
-    
-    // O Mundo da URL (Limpo)
-    env.push_back("SCRIPT_NAME=" + cleanPath);
-    env.push_back("PATH_INFO=" + cleanPath);
-    env.push_back("REQUEST_URI=" + cleanPath); // Variável que o tester adora
-    
-    // O Mundo do Disco
-    env.push_back("PATH_TRANSLATED=" + scriptPath);
-    env.push_back("SCRIPT_FILENAME=" + scriptPath);
-    
-    // O Payload
-    env.push_back("QUERY_STRING=" + cleanQuery);
-    env.push_back("CONTENT_TYPE=" + cType);
-    std::ostringstream ss;
-	ss << req.getBody().length();
-	env.push_back("CONTENT_LENGTH=" + ss.str());
-    
-    env.push_back("SERVER_PORT=9080");
-
-    return env;
-}*/
 
 std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::string& scriptPath)
 {
@@ -141,7 +93,6 @@ std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::s
     // =====================================================================
     // 4. INJETANDO OS "SPECIAL HEADERS" DO CLIENTE NO MODO CGI
     // =====================================================================
-    // Supondo que 'getHeaders()' retorne um std::map<std::string, std::string>
     const std::map<std::string, std::string>& headers = req.getHeaders();
     
     for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
@@ -169,90 +120,60 @@ std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::s
 }
 
 
-
-/*CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
+// Rewrites a path so it still works from inside dir (the CGI runs chdir'ed
+// there). getcwd/realpath are not allowed, so a relative path just climbs one
+// "../" per component of dir. Returns false when that is not possible.
+bool CgiHandler::_pathFromDir(const std::string& dir, const std::string& path, std::string& out) const
 {
-	std::cout << "🚨 TAMANHO DO BODY RECEBIDO ANTES DO CGI: " << req.getBody().length() << std::endl;
-    int outPipe[2];
-    if (pipe(outPipe) < 0)
-        throw std::runtime_error("cgi: pipe failed");
+	if (!path.empty() && path[0] == '/') {
+		out = path;
+		return true;
+	}
+	if (dir.empty() || dir[0] == '/')
+		return false;
 
-    // 1. Em vez de inPipe, criamos um arquivo físico para o Body!
-    int tmpFd = open("/tmp/webserv_cgi_body.tmp", O_CREAT | O_RDWR | O_TRUNC, 0666);
-    if (tmpFd < 0)
-        throw std::runtime_error("cgi: tmp file failed");
+	std::string ups;
+	std::string::size_type start = 0;
+	while (start <= dir.size()) {
+		std::string::size_type end = dir.find('/', start);
+		if (end == std::string::npos)
+			end = dir.size();
+		const std::string part = dir.substr(start, end - start);
+		if (part == "..")
+			return false;
+		if (!part.empty() && part != ".")
+			ups += "../";
+		start = end + 1;
+	}
+	out = ups + path;
+	return true;
+}
 
-    // Escrevemos os 100MB no disco de uma vez (o SO lida com isso em milissegundos)
-    if (req.getMethod() == "POST" && !req.getBody().empty()) {
-        write(tmpFd, req.getBody().c_str(), req.getBody().length());
-        lseek(tmpFd, 0, SEEK_SET); // Volta o "cursor" para o início do arquivo
-    }
+// scriptPath is the requested file on disk. interpreter is the location's
+// cgi_pass when there is one, otherwise it is picked by extension (py/php/sh),
+// and with neither the script is executed by itself.
+CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath, const std::string& interpreter)
+{
+    // Everything the child needs is prepared before fork(). The subject wants
+    // the CGI to run in the script's directory, so there are two versions of
+    // the paths: relative to that directory (chdir worked) and the original ones.
+    std::string execPath = interpreter.empty() ? _interpreterFor(scriptPath) : interpreter;
+    const bool scriptIsExec = execPath.empty();
+    if (scriptIsExec)
+        execPath = scriptPath;
 
-    const pid_t pid = fork();
-    if (pid < 0) {
-        close(tmpFd);
-        close(outPipe[0]);
-        close(outPipe[1]);
-        throw std::runtime_error("cgi: fork failed");
-    }
-
-    if (pid == 0) // PROCESSO FILHO
-    {
-        // Conecta a entrada padrão (STDIN) ao nosso arquivo temporário
-        dup2(tmpFd, STDIN_FILENO); 
-        close(tmpFd);
-
-        // Conecta a saída (STDOUT) ao tubo de envio
-        dup2(outPipe[1], STDOUT_FILENO);
-        close(outPipe[0]);
-        close(outPipe[1]);
-
-        const std::string interpreter = _interpreterFor(scriptPath);
-        char *argv[3];
-        if (!interpreter.empty()) {
-            argv[0] = const_cast<char*>(interpreter.c_str());
-            argv[1] = const_cast<char*>(scriptPath.c_str());
-            argv[2] = NULL;
-        } else {
-            argv[0] = const_cast<char*>(scriptPath.c_str());
-            argv[1] = NULL;
-            argv[2] = NULL;
+    std::string runDir, execInDir, scriptInDir;
+    const std::string::size_type slash = scriptPath.find_last_of('/');
+    if (slash != std::string::npos && slash > 0) {
+        const std::string dir = scriptPath.substr(0, slash);
+        if (_pathFromDir(dir, execPath, execInDir)) {
+            runDir = dir;
+            scriptInDir = scriptPath.substr(slash + 1);
+            if (scriptIsExec)
+                execInDir = "./" + scriptInDir;
         }
-
-        std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
-        std::vector<char*> envp;
-        for (size_t i = 0; i < envStr.size(); ++i)
-            envp.push_back(const_cast<char*>(envStr[i].c_str()));
-        envp.push_back(NULL);
-
-        const char* execPath = interpreter.empty() ? scriptPath.c_str() : interpreter.c_str();
-        execve(execPath, argv, &envp[0]);
-        
-        perror("ERRO NO EXECVE DO CGI");
-        _exit(1);
     }
 
-    // PROCESSO PAI (SEU SERVIDOR)
-    close(tmpFd);      // Fecha o arquivo no pai
-    close(outPipe[1]); // Fecha a escrita do tubo de saída
-
-    // NÃO TEM MAIS O LOOP WHILE(WRITE) AQUI! O PAI NÃO TRAVA MAIS!
-
-    int flags = fcntl(outPipe[0], F_GETFL, 0);
-    if (flags >= 0)
-        fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK);
-
-    CgiInfo info;
-    info.readFd = outPipe[0];
-    info.pid = pid;
-    info.start = std::time(NULL);
-
-    return info;
-}*/
-
-CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
-{
-    std::cout << "🚨 TAMANHO DO BODY RECEBIDO ANTES DO CGI: " << req.getBody().length() << std::endl;
     int outPipe[2];
     if (pipe(outPipe) < 0)
         throw std::runtime_error("cgi: pipe failed");
@@ -276,8 +197,15 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
     // =========================================================================
 
     // Escrevemos os 100MB no disco de uma vez (o SO lida com isso perfeitamente)
-    if (req.getMethod() == "POST" && !req.getBody().empty()) {
-        write(tmpFd, req.getBody().c_str(), req.getBody().length());
+    const std::string& body = req.getBody();
+    if (req.getMethod() == "POST" && !body.empty()) {
+        size_t written = 0;
+        while (written < body.size()) {
+            ssize_t n = write(tmpFd, body.data() + written, body.size() - written);
+            if (n <= 0)
+                break;
+            written += n;
+        }
         lseek(tmpFd, 0, SEEK_SET); // Volta o "cursor" para o início do arquivo
     }
 
@@ -289,43 +217,44 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
         throw std::runtime_error("cgi: fork failed");
     }
 
-    if (pid == 0) // PROCESSO FILHO
+    if (pid == 0) // Processo filho: vira o CGI
     {
         // Conecta a entrada padrão (STDIN) ao nosso arquivo temporário único
-        dup2(tmpFd, STDIN_FILENO); 
-        close(tmpFd);
+        dup2(tmpFd, STDIN_FILENO);
 
         // Conecta a saída (STDOUT) ao tubo de envio
         dup2(outPipe[1], STDOUT_FILENO);
-        close(outPipe[0]);
-        close(outPipe[1]);
 
-        const std::string interpreter = _interpreterFor(scriptPath);
+        // The child inherits every socket and pipe the server has open. Holding
+        // them would keep other clients' connections (and other scripts' pipes)
+        // alive until this script exits, so drop everything but stdin/out/err.
+        for (int fd = 3; fd < CGI_MAX_INHERITED_FD; ++fd)
+            close(fd);
+
+        // Roda no diretório do script (caminhos relativos do CGI funcionam).
+        // Se o chdir falhar, segue com os caminhos originais.
+        const bool moved = !runDir.empty() && chdir(runDir.c_str()) == 0;
+        const std::string& exe = moved ? execInDir : execPath;
+        const std::string& script = moved ? scriptInDir : scriptPath;
+
         char *argv[3];
-        if (!interpreter.empty()) {
-            argv[0] = const_cast<char*>(interpreter.c_str());
-            argv[1] = const_cast<char*>(scriptPath.c_str());
-            argv[2] = NULL;
-        } else {
-            argv[0] = const_cast<char*>(scriptPath.c_str());
-            argv[1] = NULL;
-            argv[2] = NULL;
-        }
+        argv[0] = const_cast<char*>(exe.c_str());
+        argv[1] = scriptIsExec ? NULL : const_cast<char*>(script.c_str());
+        argv[2] = NULL;
 
-        std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
+        std::vector<std::string> envStr = _buildEnvp(req, script);
         std::vector<char*> envp;
         for (size_t i = 0; i < envStr.size(); ++i)
             envp.push_back(const_cast<char*>(envStr[i].c_str()));
         envp.push_back(NULL);
 
-        const char* execPath = interpreter.empty() ? scriptPath.c_str() : interpreter.c_str();
-        execve(execPath, argv, &envp[0]);
+        execve(exe.c_str(), argv, &envp[0]);
         
         perror("ERRO NO EXECVE DO CGI");
         _exit(1);
     }
 
-    // PROCESSO PAI (SEU SERVIDOR)
+    // Processo pai (o servidor)
     close(tmpFd);      // Fecha o arquivo no pai (ele só ficará vivo agora no filho!)
     close(outPipe[1]); // Fecha a escrita do tubo de saída
 

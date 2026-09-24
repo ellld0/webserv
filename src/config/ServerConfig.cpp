@@ -1,4 +1,5 @@
 #include "../../includes/config/ServerConfig.hpp"
+#include <cstdlib>
 
 ServerConfig::ServerConfig() : interface_("0.0.0.0"), port_(0), serverName_(""), clientMaxBodySize_(""),locations_(), errorPages_() {}
 
@@ -95,4 +96,22 @@ std::string ServerConfig::getErrorPage(int errorCode) const
     }
 
     return "";
+}
+
+size_t ServerConfig::parseBodySize(const std::string& size_str) {
+    if (size_str.empty()) {
+        return 1048576;
+    }
+	char* end;
+	size_t size = std::strtoul(size_str.c_str(), &end, 10);
+    if (*end == 'M' || *end == 'm') {
+        size *= (1024 * 1024);
+    } 
+    else if (*end == 'K' || *end == 'k') {
+        size *= 1024;
+    }
+    else if (*end == 'G' || *end == 'g') {
+        size *= (1024 * 1024 * 1024);
+    }   
+    return size;
 }

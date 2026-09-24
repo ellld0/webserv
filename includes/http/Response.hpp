@@ -34,8 +34,9 @@ class Response
         void        _handleDelete(const Request& req, const ServerConfig& config);
 
         void        _serveStaticFile(const std::string& fullPath, LocationConfig* location, const Request& req);
-        void        _handleCgi(const Request& req, const std::string& scriptPath);
-        void        _parseCgiOutput(const std::string& rawOutput);
+        void        _handleCgi(const Request& req, const std::string& scriptPath,
+                               const std::string& interpreter = "");
+        void        _parseCgiOutput();
 		void		_generateDirectoryListing(const std::string& fullPath, const Request& req);
 
         void        _buildErrorResponse(const ServerConfig& config, int code);
@@ -52,9 +53,8 @@ class Response
         bool        _isPathSafe(const std::string& path) const;
 
         LocationConfig* _resolveLocation(const Request& req, const ServerConfig& config) const;
+        LocationConfig* _findCgiLocation(const Request& req, const ServerConfig& config) const;
         bool        _isMethodAllowed(const Request& req, const LocationConfig& location) const;
-
-        size_t      _parseBodySize(const std::string& sizeStr) const;
 
 
     public:
@@ -65,10 +65,11 @@ class Response
 
         void 		build(const Request& req, const ServerConfig& config);
         std::string toString() const;
+        void        releaseBody();
         int 		getStatusCode() const;
 		bool 		isCgi() const { return _isCgi; }
     	CgiInfo 	getCgiState() const { return _cgiState; }
-		std::string getCgiOutput() const { return _cgiRawOutput; }
+		const std::string& getCgiOutput() const { return _cgiRawOutput; }
 		void 		appendCgiOutput(const char* buf, size_t len);
     	void 		finalizeCgi();
     	void 		buildCgiError(const ServerConfig& config, int code);
