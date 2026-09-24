@@ -35,6 +35,9 @@ class ServerConfig {
 		const std::map<int, std::string>& getErrorPages() const;
 		std::string getErrorPage(int errorCode) const;
 
+		// "100", "10K", "200M", "1G" -> bytes (1MB when empty)
+		static size_t parseBodySize(const std::string& size_str);
+
 };
 
 #endif // SERVERCONFIG_HPP

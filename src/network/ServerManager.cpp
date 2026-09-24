@@ -106,8 +106,7 @@ void ServerManager::run() {
 		checkCgiTimeouts();
 
 		if (0 == poll_count) {
-			std::cout << "[DEBUG] Idle Server, checking for dead clients..." << std::endl;
-			// Future clean dead client function
+			// Idle turn: drop clients that stayed silent for more than 30s.
 			time_t now = std::time(NULL);
 			for (size_t i = 0; i < _pollFds.size(); i++) {
 				int fd = _pollFds[i].fd;
@@ -148,7 +147,6 @@ void ServerManager::run() {
 
 				if (revents & (POLLIN | POLLHUP | POLLERR)) {
 					if (_serverSockets.count(active_fd) > 0) {
-						std::cout << "[NETWORK] New client! AT SERVER FD: " << active_fd << ")" << std::endl;
 						struct sockaddr_in client_addr;
 						std::memset(&client_addr, 0, sizeof(client_addr));
 						socklen_t client_len = sizeof(client_addr) ;
@@ -164,10 +162,8 @@ void ServerManager::run() {
 						client_pfd.events = POLLIN;
 						client_pfd.revents = 0;
 						_pollFds.push_back(client_pfd);
-						std::cout << "[NETWORK] Client accepted." << std::endl;
 					}
 					else {
-						//std::cout << "[NETWORK] Request from an already Client! (FD: " << active_fd << ")" << std::endl;
 						char buffer[65536];
 						int bytes_read = recv(active_fd, buffer, sizeof(buffer), 0);
 						if (bytes_read > 0) {
@@ -175,7 +171,7 @@ void ServerManager::run() {
 							_clients[active_fd].updateActivity();
 							const std::string& raw_request = _clients[active_fd].getRequests();
 							int parent_server_fd = _clients[active_fd].getServerFd();
-							size_t limit = parseBodySize(_serverSockets[parent_server_fd].getClientMaxBodySize());
+							size_t limit = ServerConfig::parseBodySize(_serverSockets[parent_server_fd].getClientMaxBodySize());
 							if (raw_request.length() > limit) {
 								std::cout << "[NETWORK] Payload too big detected at Client FD: " << active_fd << std::endl;
 								std::string error_response = 
@@ -198,12 +194,13 @@ void ServerManager::run() {
                             if (result == false)
                                 continue;
 							_clients[active_fd].clearRequest();
-							std::cout << "[NETWORK] Request 100% received from Client at FD: " << active_fd << std::endl;
 							ServerConfig current_config = _serverSockets[parent_server_fd];
                             Response client_response;
                             client_response.build(client_request, current_config);
 							if (client_response.isCgi()) {
 								CgiInfo cgi_state = client_response.getCgiState();
+								std::cout << "[HTTP] " << client_request.getMethod() << " " << client_request.getPath()
+									<< " -> CGI (pid " << cgi_state.pid << ")" << std::endl;
 								_clients[active_fd].setCgiState(cgi_state);
 								_clients[active_fd].setResponseObj(client_response);
 								// Only needed when the body is fed through a stdin pipe
@@ -230,8 +227,10 @@ void ServerManager::run() {
 								_pollFds[i].events = 0;
 							}
 							else {
-							_clients[active_fd].appendResponse(client_response.toString());
-							_pollFds[i].events = POLLOUT;
+								std::cout << "[HTTP] " << client_request.getMethod() << " " << client_request.getPath()
+									<< " -> " << client_response.getStatusCode() << std::endl;
+								_clients[active_fd].appendResponse(client_response.toString());
+								_pollFds[i].events = POLLOUT;
 							}
 						}
 						else if (bytes_read == 0) {
@@ -249,13 +248,11 @@ void ServerManager::run() {
 					int bytes_sent = send(active_fd, client.pendingResponse(), client.pendingResponseSize(), 0);
 					if (bytes_sent > 0) {
 						client.trimResponse(bytes_sent);
-						if (!client.hasPendingResponse()) {
-							std::cout << "[NETWORK] Response 100% sent. Closing FD: " << active_fd << std::endl;
+						if (!client.hasPendingResponse())
 							closeFd(active_fd, i);
-						}
 					}
 					else if (bytes_sent <= 0) {
-						std::cout << "[NETWORK] Failed to sent response to FD: " << active_fd << std::endl;
+						std::cout << "[ERROR] send() failed on FD: " << active_fd << std::endl;
 						closeFd(active_fd, i);
 					}
 				}
@@ -264,9 +261,9 @@ void ServerManager::run() {
     }
 }
 
+// Closes a client connection. Only used for client sockets: CGI pipes are
+// dropped by finishCgi()/killCgi(), which also clean their own maps.
 void ServerManager::closeFd(int active_fd, size_t &i) {
-	std::cout << "[NETWORK] Closing connection on FD: " << active_fd << std::endl;
-
 	// A client may go away while its script is still running: kill the script
 	// instead of leaving an orphan pipe polling forever on a dead client.
 	if (cgiFdForClient(active_fd) >= 0)
@@ -315,7 +312,8 @@ void ServerManager::handleCgiRead(size_t &i, short revents) {
     char        buffer[65536];
     bool        eof = false;
 
-    // The client went away: nobody will read this output, just reap the script.
+    // Defensive only: closeFd() -> killCgi() already kills and reaps the script
+    // and drops this pipe when its client goes away, so this should not happen.
     if (_clients.count(client_fd) == 0) {
         close(cgi_fd);
         _cgiToClientMap.erase(cgi_fd);
@@ -372,17 +370,18 @@ void ServerManager::handleCgiWrite(size_t &i, short revents) {
 // client back to the poll loop as writable.
 void ServerManager::finishCgi(int cgi_fd, int client_fd, size_t &i) {
 	int status = 0;
+	const pid_t pid = _clients[client_fd].getCgiState().pid;
 
-	std::cout << "[CGI] Finished for Client FD: " << client_fd << std::endl;
-	waitpid(_clients[client_fd].getCgiState().pid, &status, 0);
+	waitpid(pid, &status, 0);
 
 	Response& response = _clients[client_fd].getResponseObj();
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-		std::cout << "[CGI] Script failed for Client FD: " << client_fd << std::endl;
+		std::cout << "[CGI] pid " << pid << " failed (Client FD " << client_fd << ")" << std::endl;
 		response.buildCgiError(_serverSockets[_clients[client_fd].getServerFd()], 502);
 	}
 	else
 		response.finalizeCgi();
+	std::cout << "[CGI] pid " << pid << " -> " << response.getStatusCode() << std::endl;
 
 	_clients[client_fd].appendResponse(response.toString());
 	response.releaseBody();
@@ -483,22 +482,4 @@ bool ServerManager::requestLooksComplete(const std::string& raw) {
 		return body_len >= expected;
 	}
 	return true;
-}
-
-size_t ServerManager::parseBodySize(const std::string& size_str) {
-    if (size_str.empty()) {
-        return 1048576;
-    }
-	char* end;
-	size_t size = std::strtoul(size_str.c_str(), &end, 10);
-    if (*end == 'M' || *end == 'm') {
-        size *= (1024 * 1024);
-    } 
-    else if (*end == 'K' || *end == 'k') {
-        size *= 1024;
-    }
-    else if (*end == 'G' || *end == 'g') {
-        size *= (1024 * 1024 * 1024);
-    }   
-    return size;
 }

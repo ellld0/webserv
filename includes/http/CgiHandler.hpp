@@ -26,10 +26,12 @@ public:
     CgiHandler(const CgiHandler &other);
     CgiHandler &operator=(const CgiHandler &other);
 
-    CgiInfo startCgi(const Request& req, const std::string& scriptPath);
+    CgiInfo startCgi(const Request& req, const std::string& scriptPath,
+                     const std::string& interpreter = "");
 
 private:
     std::string _interpreterFor(const std::string& scriptPath) const;
+    bool _pathFromDir(const std::string& dir, const std::string& path, std::string& out) const;
     std::vector<std::string> _buildEnvp(const Request& req, const std::string& scriptPath);
 };
 

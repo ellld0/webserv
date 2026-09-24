@@ -7,7 +7,9 @@ LocationConfig::LocationConfig() : path_(""),
                      redirectCode_(0),
                      redirectUrl_(""),
                      index_(),
-                     uploadPath_("")
+                     uploadPath_(""),
+                     _client_max_body_size(""),
+                     _cgi_pass("")
                      {}
 
 LocationConfig::LocationConfig(const LocationConfig& other)
@@ -18,7 +20,9 @@ LocationConfig::LocationConfig(const LocationConfig& other)
       redirectCode_(other.redirectCode_),
       redirectUrl_(other.redirectUrl_),
       index_(other.index_),
-      uploadPath_(other.uploadPath_)
+      uploadPath_(other.uploadPath_),
+      _client_max_body_size(other._client_max_body_size),
+      _cgi_pass(other._cgi_pass)
 {
 
 }
@@ -35,6 +39,8 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other)
         redirectUrl_ = other.redirectUrl_;
         index_ = other.index_;
         uploadPath_ = other.uploadPath_;
+        _client_max_body_size = other._client_max_body_size;
+        _cgi_pass = other._cgi_pass;
     }
     return *this;
 }
@@ -128,7 +134,6 @@ const std::string& LocationConfig::getUploadPath() const
 void LocationConfig::setClientMaxBodySize(const std::string& client_max_body_size)
 {
     _client_max_body_size = client_max_body_size;
-	//criar parse para lidar com letras definindo tamanhos
 }
 
 const std::string& LocationConfig::getClientMaxBodySize() const
