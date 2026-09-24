@@ -1,5 +1,11 @@
 # Commands to Test Web Serv
 
+## Create 100MB File
+dd if=/dev/zero of=arquivo_100mb.txt bs=1M count=100
+
+## Test POST 100MB
+curl -v -X POST --data-binary @arquivo_100mb.txt http://localhost:9080/directory/youpi.bla
+
 ## GET
 curl -i -X GET http://localhost:9080
 
