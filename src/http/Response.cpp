@@ -743,8 +743,20 @@ std::string Response::toString() const
     }
 
     ss << "\r\n";
-    ss << _body;
-    return ss.str();
+
+    // Appending the body directly avoids streaming (and regrowing) a copy of
+    // it inside the ostringstream, which matters for 100MB CGI answers.
+    std::string out = ss.str();
+    out.reserve(out.size() + _body.size());
+    out += _body;
+    return out;
+}
+
+// Frees the (possibly huge) body once it was serialized with toString().
+void Response::releaseBody()
+{
+    std::string().swap(_body);
+    std::string().swap(_cgiRawOutput);
 }
 
 int Response::getStatusCode() const
@@ -797,6 +809,8 @@ void Response::finalizeCgi()
 {
     _setStatus(200);
     _parseCgiOutput(_cgiRawOutput);
+    // The body was copied out of the raw output, no need to keep both.
+    std::string().swap(_cgiRawOutput);
     // build() already ran _finalizeHeaders() while the body was still empty,
     // so Content-Length has to be recomputed now that the body is known.
     _finalizeHeaders();

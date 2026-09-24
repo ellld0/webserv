@@ -159,7 +159,7 @@ std::string Request::getQueryString() const { return _queryString; }
 
 std::string Request::getHttpVersion() const { return _httpVersion; }
 
-std::string Request::getBody() const { return _body; }
+const std::string& Request::getBody() const { return _body; }
 
 std::string Request::getHeader(const std::string& key) const
 {

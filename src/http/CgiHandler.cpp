@@ -276,8 +276,15 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
     // =========================================================================
 
     // Escrevemos os 100MB no disco de uma vez (o SO lida com isso perfeitamente)
-    if (req.getMethod() == "POST" && !req.getBody().empty()) {
-        write(tmpFd, req.getBody().c_str(), req.getBody().length());
+    const std::string& body = req.getBody();
+    if (req.getMethod() == "POST" && !body.empty()) {
+        size_t written = 0;
+        while (written < body.size()) {
+            ssize_t n = write(tmpFd, body.data() + written, body.size() - written);
+            if (n <= 0)
+                break;
+            written += n;
+        }
         lseek(tmpFd, 0, SEEK_SET); // Volta o "cursor" para o início do arquivo
     }
 
@@ -292,13 +299,16 @@ CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
     if (pid == 0) // PROCESSO FILHO
     {
         // Conecta a entrada padrão (STDIN) ao nosso arquivo temporário único
-        dup2(tmpFd, STDIN_FILENO); 
-        close(tmpFd);
+        dup2(tmpFd, STDIN_FILENO);
 
         // Conecta a saída (STDOUT) ao tubo de envio
         dup2(outPipe[1], STDOUT_FILENO);
-        close(outPipe[0]);
-        close(outPipe[1]);
+
+        // The child inherits every socket and pipe the server has open. Holding
+        // them would keep other clients' connections (and other scripts' pipes)
+        // alive until this script exits, so drop everything but stdin/out/err.
+        for (int fd = 3; fd < CGI_MAX_INHERITED_FD; ++fd)
+            close(fd);
 
         const std::string interpreter = _interpreterFor(scriptPath);
         char *argv[3];

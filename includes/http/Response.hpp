@@ -65,10 +65,11 @@ class Response
 
         void 		build(const Request& req, const ServerConfig& config);
         std::string toString() const;
+        void        releaseBody();
         int 		getStatusCode() const;
 		bool 		isCgi() const { return _isCgi; }
     	CgiInfo 	getCgiState() const { return _cgiState; }
-		std::string getCgiOutput() const { return _cgiRawOutput; }
+		const std::string& getCgiOutput() const { return _cgiRawOutput; }
 		void 		appendCgiOutput(const char* buf, size_t len);
     	void 		finalizeCgi();
     	void 		buildCgiError(const ServerConfig& config, int code);

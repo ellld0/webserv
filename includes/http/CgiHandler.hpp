@@ -7,6 +7,9 @@
 #include <sys/types.h>
 #include "../../includes/http/Request.hpp"
 
+// Upper bound of fds the CGI child closes before execve (the default ulimit)
+#define CGI_MAX_INHERITED_FD 1024
+
 struct CgiInfo {
     int         readFd;     // parent reads the script output here
     int         writeFd;    // parent writes the request body here (-1 when there is none)
