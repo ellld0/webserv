@@ -50,7 +50,6 @@ bool Client::hasPendingResponse() const {
 	return this->_responseSent < this->_responses.size();
 }
 
-// Frees the raw request once it was parsed: it can be 100MB per client.
 void Client::clearRequest() {
 	std::string().swap(this->_requests);
 }
@@ -67,8 +66,6 @@ void Client::appendRequest(const char* data, size_t len) {
 	this->_requests.append(data, len);
 }
 
-// Only moves the offset: erasing the front of a 100MB string on every send()
-// would copy the whole response again each time.
 void Client::trimResponse(size_t bytes_sent) {
 	this->_responseSent += bytes_sent;
 	if (this->_responseSent >= this->_responses.size()) {

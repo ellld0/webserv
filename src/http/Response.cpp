@@ -209,9 +209,6 @@ LocationConfig* Response::_resolveLocation(const Request& req, const ServerConfi
     return bestMatch;
 }
 
-// Finds an extension location ("*.bla") matching the request path that has a
-// cgi_pass and accepts the request method. Such locations never match by
-// prefix in _resolveLocation(), so they only decide *how* a file is served.
 LocationConfig* Response::_findCgiLocation(const Request& req, const ServerConfig& config) const
 {
     const std::string& path = req.getPath();
@@ -303,7 +300,7 @@ void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* loc
 
 	if (access(fullPath.c_str(), R_OK) != 0)
 	{
-		_setStatus(403); // Sem permissão = 403 Forbidden
+        _setStatus(403);
 		return;
 	}
 
@@ -317,8 +314,6 @@ void Response::_serveStaticFile(const std::string& fullPath, LocationConfig* loc
     _setHeader("Content-Type", _contentTypeFor(fullPath));
 }
 
-// Splits _cgiRawOutput into headers and body. The body is moved (erase + swap)
-// instead of copied: CGI answers can be 100MB.
 void Response::_parseCgiOutput()
 {
     std::string::size_type sep = _cgiRawOutput.find("\r\n\r\n");
@@ -460,8 +455,6 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
         return;
     }
 
-    // A location may set its own client_max_body_size (e.g. /post_body 100),
-    // otherwise the server one applies.
     std::string maxBodySize = location->getClientMaxBodySize();
     if (maxBodySize.empty())
         maxBodySize = config.getClientMaxBodySize();
@@ -475,7 +468,6 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     std::string targetPath = _resolveTargetPath(req, location);
     std::string fullPath = root + targetPath;
 
-    // Extension locations ("location *.bla { cgi_pass ./cgi_tester; }")
     LocationConfig* cgiLocation = _findCgiLocation(req, config);
     if(cgiLocation)
     {
@@ -524,8 +516,6 @@ void Response::_handlePost(const Request& req, const ServerConfig& config)
     }
     else
     {
-        // POST is allowed here but there is nothing to run or store: just
-        // acknowledge it (the tester's /post_body expects any answer).
         _setStatus(200);
         _body = "POST received.\n";
         _setHeader("Content-Type", "text/plain");
@@ -660,15 +650,12 @@ std::string Response::toString() const
 
     ss << "\r\n";
 
-    // Appending the body directly avoids streaming (and regrowing) a copy of
-    // it inside the ostringstream, which matters for 100MB CGI answers.
     std::string out = ss.str();
     out.reserve(out.size() + _body.size());
     out += _body;
     return out;
 }
 
-// Frees the (possibly huge) body once it was serialized with toString().
 void Response::releaseBody()
 {
     std::string().swap(_body);
@@ -698,7 +685,7 @@ void Response::_generateDirectoryListing(const std::string& fullPath, const Requ
         {
             std::string filename = ent->d_name;
             
-            if (filename == ".") continue; 
+            if (filename == ".") continue;
 
             html += "<li><a href=\"" + reqPath + filename + "\">" + filename + "</a></li>";
         }
@@ -725,8 +712,6 @@ void Response::finalizeCgi()
 {
     _setStatus(200);
     _parseCgiOutput();
-    // build() already ran _finalizeHeaders() while the body was still empty,
-    // so Content-Length has to be recomputed now that the body is known.
     _finalizeHeaders();
 }
 

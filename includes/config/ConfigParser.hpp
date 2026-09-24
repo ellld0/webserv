@@ -36,4 +36,4 @@ class ConfigParser
 
 };
 
-#endif // CONFIGPARSER_HPP
+#endif

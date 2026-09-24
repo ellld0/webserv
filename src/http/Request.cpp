@@ -59,7 +59,6 @@ void Request::_parseHeaders(const std::string& rawHeaders)
     }
 }
 
-// Método publico principal para parsear a requisição HTTP
 
 bool Request::parse(const std::string& rawBuffer)
 {
@@ -71,10 +70,8 @@ bool Request::parse(const std::string& rawBuffer)
         return false;
     }
 
-    // 1. Calcula o tamanho que já chegou SEM ALOCAR NADA NA MEMÓRIA! (Super Rápido)
     size_t current_body_length = rawBuffer.length() - (headerEndPos + separator.size());
 
-    // 2. Extrai APENAS o cabeçalho para fazer o parse (é pequeno, rápido)
     std::string headerSection = rawBuffer.substr(0, headerEndPos);
 
     std::istringstream ss(headerSection);
@@ -88,11 +85,8 @@ bool Request::parse(const std::string& rawBuffer)
 
     std::string headersRaw = headerSection.substr(requestLine.size() + 2);
     
-    // PRIMEIRO parseia e salva os cabeçalhos (para o getHeader funcionar abaixo)
     _parseHeaders(headersRaw);
 
-    // 3. A Trava Matemática
-    // Lemos o Transfer-Encoding aqui fora para a variável sobreviver até o Passo 4
     std::string tEncStr = getHeader("Transfer-Encoding");
     if (tEncStr.empty()) tEncStr = getHeader("transfer-encoding");
 
@@ -104,14 +98,12 @@ bool Request::parse(const std::string& rawBuffer)
         if (!cLenStr.empty()) {
             size_t expected_length = std::strtoul(cLenStr.c_str(), NULL, 10);
             
-            // Rejeita antes de fazer o substr() pesado se ainda não chegou tudo!
             if (current_body_length < expected_length) {
                 _complete = false;
                 return false;
             }
         }
         else if (tEncStr.find("chunked") != std::string::npos) {
-            // Modo chunked: Procura no rawBuffer porque o _body ainda não foi alocado!
             if (rawBuffer.find("0\r\n\r\n") == std::string::npos) {
                 _complete = false;
                 return false;
@@ -119,29 +111,24 @@ bool Request::parse(const std::string& rawBuffer)
         }
     }
 
-    // 4. Se chegou aqui, os 100MB chegaram inteiros!
-    // Vamos "descompactar" se for chunked, ou copiar direto se for tamanho fixo
     if (tEncStr.find("chunked") != std::string::npos) {
-        // Descompacta o Chunked Body sem travar o C++ (Otimizado)
         size_t pos = headerEndPos + separator.size();
-        _body.reserve(rawBuffer.length()); // Evita cópias lentas na memória
+            _body.reserve(rawBuffer.length());
         
         while (pos < rawBuffer.length()) {
             size_t lineEnd = rawBuffer.find("\r\n", pos);
             if (lineEnd == std::string::npos) break;
             
-            // Pega o tamanho em hexadecimal e converte pra decimal (base 16)
             std::string hexStr = rawBuffer.substr(pos, lineEnd - pos);
             size_t chunkSize = std::strtoul(hexStr.c_str(), NULL, 16);
             
-            if (chunkSize == 0) break; // 0\r\n\r\n indica o fim do envio
+            if (chunkSize == 0) break;
             
-            pos = lineEnd + 2; // Pula o hex e o \r\n
-            _body.append(rawBuffer, pos, chunkSize); // Extrai só os dados puros
-            pos += chunkSize + 2; // Pula os dados e o \r\n do final do chunk
+            pos = lineEnd + 2;
+            _body.append(rawBuffer, pos, chunkSize);
+            pos += chunkSize + 2;
         }
     } else {
-        // Modo normal: Faz a cópia gigante UMA ÚNICA VEZ.
         _body = rawBuffer.substr(headerEndPos + separator.size());
     }
     

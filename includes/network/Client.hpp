@@ -17,7 +17,6 @@ class Client {
 		int			getServerFd() const;
 		int			getClientFd() const;
 		const std::string&	getRequests() const;
-		// Response bytes not sent yet start at pendingResponse()
 		const char*	pendingResponse() const;
 		size_t		pendingResponseSize() const;
 		bool		hasPendingResponse() const;

@@ -96,15 +96,21 @@ The current sample configuration demonstrates multiple listening ports, static c
 
 ### References
 
-Linux Manual (https://man7.org/index.html ) - To understand every syscall functions used is this project like poll(), send(), accept() and others. Also to understand struct data used via libraries like pollfd and sockaddr.
+**Linux Manual** (https://man7.org/index.html ) - To understand every syscall functions used is this project like poll(), send(), accept() and others. Also to understand struct data used via libraries like pollfd and sockaddr.
 
-CPP Reference (https://cppreference.com/) - To understand, discovery methods and features from native classes from C++98 utilized in project like std::map and std::vector. 
+**CPP Reference** (https://cppreference.com/) - To understand, discovery methods and features from native classes from C++98 utilized in project like std::map and std::vector. 
 
-IBM Documentation (https://www.ibm.com/docs/en/i/7.4.0?topic=designs-using-poll-instead-select) - How poll() works, why poll() between select() and the base of an webserver code.
+**IBM Documentation** (https://www.ibm.com/docs/en/i/7.4.0?topic=designs-using-poll-instead-select) - How poll() works, why poll() between select() and the base of an webserver code.
  
-Youtube (https://www.youtube.com/watch?v=YwHErWJIh6Y&t=684s) - C++ Web Server from Scratch | Part 1: Creating a Socket Object by Eric O Meehan - Learn how to build an webserver in C++
+**Youtube** (https://www.youtube.com/watch?v=YwHErWJIh6Y&t=684s) - C++ Web Server from Scratch | Part 1: Creating a Socket Object by Eric O Meehan - Learn how to build an webserver in C++
 
-IETF Org (https://datatracker.ietf.org/doc/html/rfc3875) - To understand what CGI is and how it works.
+**IETF Org** (https://datatracker.ietf.org/doc/html/rfc3875) - To understand what CGI is and how it works.
+
+**Alphabetical Index of Directives** — https://nginx.org/en/docs/dirindex.html
+Used to understand how to implement the configuration file, inspired by the Nginx configuration structure.
+
+**Beginner’s Guide** — https://nginx.org/en/docs/beginners_guide.html
+A detailed guide to understanding Nginx and its configuration system.
 
 ### Use of artificial intelligence
 

@@ -46,4 +46,4 @@ class LocationConfig {
 
 };
 
-#endif // LOCATIONCONFIG_HPP
+#endif
