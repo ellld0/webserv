@@ -39,7 +39,8 @@ curl -i "http://localhost:9080/cgi-bin/error_script.py"
 curl -i "http://localhost:9080/cgi-bin/infinity_loop.py"
 
 ## Siege Test
-siege -b -c 100 -t 30S http://localhost:9080
+siege -b -c 100 -r 5000 http://localhost:9080
+siege -b -c 100 -t 10S http://localhost:9080
 
 
 ## Tester
