@@ -15,6 +15,9 @@ class LocationConfig {
 		std::string redirectUrl_;
 		std::string index_;
 		std::string uploadPath_;
+		std::string _client_max_body_size;
+		std::string _cgi_pass;
+
 	public:
 		LocationConfig();
 		LocationConfig(const LocationConfig& other);
@@ -36,6 +39,10 @@ class LocationConfig {
 		const std::string& getIndex() const;
 		void setUploadPath(const std::string& path);
 		const std::string& getUploadPath() const;
+		void setClientMaxBodySize(const std::string& client_max_body_size);
+		const std::string& getClientMaxBodySize() const;
+		void setCgiPass(const std::string& cgi_passs);
+		const std::string& getCgiPass() const;
 
 };
 

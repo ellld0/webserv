@@ -6,6 +6,7 @@
 # include <string>
 # include <map>
 # include <sstream>
+# include <cstdlib>
 
 
 class Request
@@ -37,6 +38,7 @@ class Request
         std::string getHttpVersion() const;
         std::string getHeader(const std::string& key) const;
         std::string getBody() const;
+		const std::map<std::string, std::string>& getHeaders() const { return _headers; }
 };
 
 #endif

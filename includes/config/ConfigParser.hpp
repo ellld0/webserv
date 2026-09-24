@@ -31,7 +31,8 @@ class ConfigParser
 		void parseReturnDirective(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasReturn);
 		void parseIndexDirective(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasIndex);
 		void parseUploadDirective(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasUpload);
-		
+		void parseClientMaxBodySize(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasMaxBodySize);
+		void parseCgiPass(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasCgiPass);
 
 };
 

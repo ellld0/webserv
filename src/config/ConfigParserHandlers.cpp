@@ -233,3 +233,29 @@ void ConfigParser::parseUploadDirective(LocationConfig& loc, const std::vector<s
     hasUpload = true;
     i += 3;
 }
+
+void ConfigParser::parseClientMaxBodySize(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasMaxBodySize)
+{
+	if (hasMaxBodySize)
+		throw std::runtime_error("Error: duplicate 'client_max_body_size' directive.");
+	if (i + 1 >= tokens.size() || tokens[i + 1] == ";")
+        throw std::runtime_error("'client_max_body_size' cannot be empty");
+	if (i + 2 >= tokens.size() || tokens[i + 2] != ";")
+        throw std::runtime_error("Error: expected ';' after 'client_max_body_size'.");
+	loc.setClientMaxBodySize(tokens[i + 1]);
+	hasMaxBodySize = true;
+	i += 3;
+}
+
+void ConfigParser::parseCgiPass(LocationConfig& loc, const std::vector<std::string>& tokens, size_t& i, bool& hasCgiPass)
+{
+	if (hasCgiPass)
+		throw std::runtime_error("Error: duplicate 'cgi_pass' directive.");
+	if (i + 1 >= tokens.size() || tokens[i + 1] == ";")
+        throw std::runtime_error("'cgi_pass' cannot be empty");
+	if (i + 2 >= tokens.size() || tokens[i + 2] != ";")
+        throw std::runtime_error("Error: expected ';' after 'cgi_pass'.");
+	loc.setCgiPass(tokens[i + 1]);
+	hasCgiPass = true;
+	i += 3;
+}

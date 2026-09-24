@@ -165,15 +165,16 @@ void ServerManager::run() {
 						std::cout << "[NETWORK] Client accepted." << std::endl;
 					}
 					else {
-						std::cout << "[NETWORK] Request from an already Client! (FD: " << active_fd << ")" << std::endl;
-						char buffer[4096];
-						int bytes_read = recv(active_fd, buffer, sizeof(buffer) - 1, 0);
+						//std::cout << "[NETWORK] Request from an already Client! (FD: " << active_fd << ")" << std::endl;
+						char buffer[65536];
+						int bytes_read = recv(active_fd, buffer, sizeof(buffer), 0);
 						if (bytes_read > 0) {
-							buffer[bytes_read] = 0;
-							std::cout << "[NETWORK] Request received from Client at FD: " << active_fd << std::endl;
-							std::cout << buffer << std::endl;
-							std::cout << "-----------------------------" << std::endl;
-							_clients[active_fd].appendRequest(buffer);
+							//buffer[bytes_read] = 0;
+							//std::cout << "[NETWORK] Request received from Client at FD: " << active_fd << std::endl;
+							_clients[active_fd].appendRequest(std::string(buffer, bytes_read));
+							std::cout << "\r[NETWORK] Baixando: " 
+								<< _clients[active_fd].getRequests().length() 
+								<< " bytes" << std::flush;
 							_clients[active_fd].updateActivity();
 							int parent_server_fd = _clients[active_fd].getServerFd();
 							size_t limit = parseBodySize(_serverSockets[parent_server_fd].getClientMaxBodySize());
@@ -304,33 +305,89 @@ int ServerManager::cgiFdForClient(int client_fd) const {
 // "nothing right now", so EOF is what read() == 0 reports - or, when the buffer
 // is already empty, the POLLHUP that poll() raises on a hung up pipe.
 void ServerManager::handleCgiRead(size_t &i, short revents) {
-	const int	cgi_fd = _pollFds[i].fd;
-	const int	client_fd = _cgiToClientMap[cgi_fd];
-	char		buffer[4096];
-	bool		eof = false;
+    const int   cgi_fd = _pollFds[i].fd;
+    const int   client_fd = _cgiToClientMap[cgi_fd];
+    
+    // Deixei o buffer grande aqui também para o CGI ler rápido!
+    char        buffer[65536]; 
+    bool        eof = false;
 
-	if (_clients.count(client_fd) == 0) {
-		close(cgi_fd);
-		_cgiToClientMap.erase(cgi_fd);
-		removePollFd(cgi_fd, i);
-		return;
-	}
+    if (_clients.count(client_fd) == 0) {
+        close(cgi_fd);
+        _cgiToClientMap.erase(cgi_fd);
+        removePollFd(cgi_fd, i);
+        return;
+    }
 
-	while (true) {
-		int bytes_read = read(cgi_fd, buffer, sizeof(buffer));
-		if (bytes_read > 0) {
-			_clients[client_fd].getResponseObj().appendCgiOutput(buffer, bytes_read);
-			continue;
-		}
-		if (bytes_read == 0)
-			eof = true;
-		break;
-	}
+    while (true) {
+        int bytes_read = read(cgi_fd, buffer, sizeof(buffer));
+        
+        if (bytes_read > 0) {
+            _clients[client_fd].getResponseObj().appendCgiOutput(buffer, bytes_read);
+            continue;
+        }
+        
+        if (bytes_read == 0) // O CGI TERMINOU DE ENVIAR OS DADOS
+        {
+            // 1. Puxa os dados acumulados direto da sua classe Response
+            std::string cgi_raw_output = _clients[client_fd].getResponseObj().getCgiOutput(); 
 
-	if (!eof && (revents & (POLLHUP | POLLERR | POLLNVAL)))
-		eof = true;
-	if (eof)
-		finishCgi(cgi_fd, client_fd, i);
+            // 2. Procura onde os cabeçalhos do CGI terminam
+            size_t header_pos = cgi_raw_output.find("\r\n\r\n");
+            size_t separator_len = 4;
+
+            if (header_pos == std::string::npos) {
+                header_pos = cgi_raw_output.find("\n\n");
+                separator_len = 2;
+            }
+
+            if (header_pos != std::string::npos) 
+            {
+                // 3. Separa o que é cabeçalho do que é arquivo real
+                std::string cgi_headers = cgi_raw_output.substr(0, header_pos);
+                size_t body_size = cgi_raw_output.length() - (header_pos + separator_len);
+
+                // 4. Monta a Resposta HTTP oficial
+                std::ostringstream final_response;
+                final_response << "HTTP/1.1 200 OK\r\n";
+                final_response << cgi_headers << "\r\n"; // Headers do CGI
+                final_response << "Content-Length: " << body_size << "\r\n\r\n";
+                
+                std::string response_str = final_response.str();
+                
+                // 5. Anexa o body gigante
+                response_str.append(cgi_raw_output, header_pos + separator_len, std::string::npos);
+
+                // 6. Coloca na fila do Client para ser enviado
+                _clients[client_fd].appendResponse(response_str);
+            }
+            else 
+            {
+                // Erro de segurança
+                std::string err = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
+                _clients[client_fd].appendResponse(err);
+            }
+
+            // Marca para enviar a resposta ao cliente
+            for (size_t j = 0; j < _pollFds.size(); ++j) {
+                if (_pollFds[j].fd == client_fd) {
+                    _pollFds[j].events = POLLOUT;
+                    break;
+                }
+            }
+
+            // Aqui você fecha o FD. Mantive do jeito que estava no seu código.
+            closeFd(cgi_fd, i); 
+            break; 
+        }
+            
+        break; // Sai do while(true) se for bytes_read < 0 (EAGAIN)
+    }
+
+    if (!eof && (revents & (POLLHUP | POLLERR | POLLNVAL)))
+        eof = true;
+    if (eof)
+        finishCgi(cgi_fd, client_fd, i);
 }
 
 // Feeds the request body to the script's stdin, one poll() turn at a time.

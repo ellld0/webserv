@@ -49,7 +49,7 @@ void Client::appendResponse(std::string response) {
 	this->_responses += response;
 }
 
-void Client::appendRequest(std::string request) {
+void Client::appendRequest(const std::string request) {
 	this->_requests += request;
 }
 

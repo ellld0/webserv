@@ -5,10 +5,15 @@
 #include <poll.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <stdio.h>
 
+#include <iostream>
 #include <ctime>
 #include <stdexcept>
 #include <vector>
+#include <sstream>
+#include <cstdio>
+
 
 CgiHandler::CgiHandler() {}
 
@@ -41,121 +46,298 @@ std::string CgiHandler::_interpreterFor(const std::string& scriptPath) const
 	return "";
 }
 
+/*std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::string& scriptPath)
+{
+    std::vector<std::string> env;
+
+    // 1. Limpamos o PATH (Remove o \r se existir)
+    std::string cleanPath = req.getPath();
+    if (!cleanPath.empty() && cleanPath[cleanPath.length() - 1] == '\r')
+        cleanPath.erase(cleanPath.length() - 1);
+
+    // 2. Limpamos a Query String
+    std::string cleanQuery = req.getQueryString();
+    if (!cleanQuery.empty() && cleanQuery[cleanQuery.length() - 1] == '\r')
+        cleanQuery.erase(cleanQuery.length() - 1);
+
+    // 3. Limpamos os Headers críticos
+    std::string cType = req.getHeader("Content-Type");
+    if (!cType.empty() && cType[cType.length() - 1] == '\r')
+        cType.erase(cType.length() - 1);
+
+    std::string cLen = req.getHeader("Content-Length");
+    if (!cLen.empty() && cLen[cLen.length() - 1] == '\r')
+        cLen.erase(cLen.length() - 1);
+
+    // Montando o Env Oficial
+    env.push_back("GATEWAY_INTERFACE=CGI/1.1");
+    env.push_back("SERVER_PROTOCOL=HTTP/1.1");
+    env.push_back("REQUEST_METHOD=" + req.getMethod());
+    
+    // O Mundo da URL (Limpo)
+    env.push_back("SCRIPT_NAME=" + cleanPath);
+    env.push_back("PATH_INFO=" + cleanPath);
+    env.push_back("REQUEST_URI=" + cleanPath); // Variável que o tester adora
+    
+    // O Mundo do Disco
+    env.push_back("PATH_TRANSLATED=" + scriptPath);
+    env.push_back("SCRIPT_FILENAME=" + scriptPath);
+    
+    // O Payload
+    env.push_back("QUERY_STRING=" + cleanQuery);
+    env.push_back("CONTENT_TYPE=" + cType);
+    std::ostringstream ss;
+	ss << req.getBody().length();
+	env.push_back("CONTENT_LENGTH=" + ss.str());
+    
+    env.push_back("SERVER_PORT=9080");
+
+    return env;
+}*/
+
 std::vector<std::string> CgiHandler::_buildEnvp(const Request& req, const std::string& scriptPath)
 {
-	std::vector<std::string> env;
+    std::vector<std::string> env;
 
-	env.push_back("GATEWAY_INTERFACE=CGI/1.1");
-	env.push_back("SERVER_PROTOCOL=HTTP/1.1");
-	env.push_back("REQUEST_METHOD=" + req.getMethod());
-	env.push_back("SCRIPT_FILENAME=" + scriptPath);
-	env.push_back("SCRIPT_NAME=" + req.getPath());
-	env.push_back("QUERY_STRING=" + req.getQueryString());
-	env.push_back("CONTENT_TYPE=" + req.getHeader("Content-Type"));
-	env.push_back("CONTENT_LENGTH=" + req.getHeader("Content-Length"));
-	env.push_back("REDIRECT_STATUS=200");
-	return env;
+    // 1. Limpamos o PATH (Remove o \r se existir)
+    std::string cleanPath = req.getPath();
+    if (!cleanPath.empty() && cleanPath[cleanPath.length() - 1] == '\r')
+        cleanPath.erase(cleanPath.length() - 1);
+
+    // 2. Limpamos a Query String
+    std::string cleanQuery = req.getQueryString();
+    if (!cleanQuery.empty() && cleanQuery[cleanQuery.length() - 1] == '\r')
+        cleanQuery.erase(cleanQuery.length() - 1);
+
+    // 3. Limpamos os Headers críticos
+    std::string cType = req.getHeader("Content-Type");
+    if (!cType.empty() && cType[cType.length() - 1] == '\r')
+        cType.erase(cType.length() - 1);
+
+    // Montando o Env Oficial
+    env.push_back("GATEWAY_INTERFACE=CGI/1.1");
+    env.push_back("SERVER_PROTOCOL=HTTP/1.1");
+    env.push_back("REQUEST_METHOD=" + req.getMethod());
+    
+    // O Mundo da URL (Limpo)
+    env.push_back("SCRIPT_NAME=" + cleanPath);
+    env.push_back("PATH_INFO=" + cleanPath);
+    env.push_back("REQUEST_URI=" + cleanPath); // Variável que o tester adora
+    
+    // O Mundo do Disco
+    env.push_back("PATH_TRANSLATED=" + scriptPath);
+    env.push_back("SCRIPT_FILENAME=" + scriptPath);
+    
+    // O Payload
+    env.push_back("QUERY_STRING=" + cleanQuery);
+    env.push_back("CONTENT_TYPE=" + cType);
+    
+    std::ostringstream ss;
+    ss << req.getBody().length();
+    env.push_back("CONTENT_LENGTH=" + ss.str());
+    
+    env.push_back("SERVER_PORT=9080");
+
+    // =====================================================================
+    // 4. INJETANDO OS "SPECIAL HEADERS" DO CLIENTE NO MODO CGI
+    // =====================================================================
+    // Supondo que 'getHeaders()' retorne um std::map<std::string, std::string>
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+        std::string headerName = it->first;
+        std::string headerValue = it->second;
+
+        // Limpa o \r do valor, por garantia
+        if (!headerValue.empty() && headerValue[headerValue.length() - 1] == '\r')
+            headerValue.erase(headerValue.length() - 1);
+
+        // Formata a chave para o padrão CGI: prefixo HTTP_, maiúsculas, '-' vira '_'
+        std::string envKey = "HTTP_";
+        for (size_t i = 0; i < headerName.length(); ++i) {
+            if (headerName[i] == '-') {
+                envKey += '_';
+            } else {
+                envKey += std::toupper(headerName[i]);
+            }
+        }
+        
+        env.push_back(envKey + "=" + headerValue);
+    }
+
+    return env;
 }
+
+
+
+/*CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
+{
+	std::cout << "🚨 TAMANHO DO BODY RECEBIDO ANTES DO CGI: " << req.getBody().length() << std::endl;
+    int outPipe[2];
+    if (pipe(outPipe) < 0)
+        throw std::runtime_error("cgi: pipe failed");
+
+    // 1. Em vez de inPipe, criamos um arquivo físico para o Body!
+    int tmpFd = open("/tmp/webserv_cgi_body.tmp", O_CREAT | O_RDWR | O_TRUNC, 0666);
+    if (tmpFd < 0)
+        throw std::runtime_error("cgi: tmp file failed");
+
+    // Escrevemos os 100MB no disco de uma vez (o SO lida com isso em milissegundos)
+    if (req.getMethod() == "POST" && !req.getBody().empty()) {
+        write(tmpFd, req.getBody().c_str(), req.getBody().length());
+        lseek(tmpFd, 0, SEEK_SET); // Volta o "cursor" para o início do arquivo
+    }
+
+    const pid_t pid = fork();
+    if (pid < 0) {
+        close(tmpFd);
+        close(outPipe[0]);
+        close(outPipe[1]);
+        throw std::runtime_error("cgi: fork failed");
+    }
+
+    if (pid == 0) // PROCESSO FILHO
+    {
+        // Conecta a entrada padrão (STDIN) ao nosso arquivo temporário
+        dup2(tmpFd, STDIN_FILENO); 
+        close(tmpFd);
+
+        // Conecta a saída (STDOUT) ao tubo de envio
+        dup2(outPipe[1], STDOUT_FILENO);
+        close(outPipe[0]);
+        close(outPipe[1]);
+
+        const std::string interpreter = _interpreterFor(scriptPath);
+        char *argv[3];
+        if (!interpreter.empty()) {
+            argv[0] = const_cast<char*>(interpreter.c_str());
+            argv[1] = const_cast<char*>(scriptPath.c_str());
+            argv[2] = NULL;
+        } else {
+            argv[0] = const_cast<char*>(scriptPath.c_str());
+            argv[1] = NULL;
+            argv[2] = NULL;
+        }
+
+        std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
+        std::vector<char*> envp;
+        for (size_t i = 0; i < envStr.size(); ++i)
+            envp.push_back(const_cast<char*>(envStr[i].c_str()));
+        envp.push_back(NULL);
+
+        const char* execPath = interpreter.empty() ? scriptPath.c_str() : interpreter.c_str();
+        execve(execPath, argv, &envp[0]);
+        
+        perror("ERRO NO EXECVE DO CGI");
+        _exit(1);
+    }
+
+    // PROCESSO PAI (SEU SERVIDOR)
+    close(tmpFd);      // Fecha o arquivo no pai
+    close(outPipe[1]); // Fecha a escrita do tubo de saída
+
+    // NÃO TEM MAIS O LOOP WHILE(WRITE) AQUI! O PAI NÃO TRAVA MAIS!
+
+    int flags = fcntl(outPipe[0], F_GETFL, 0);
+    if (flags >= 0)
+        fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK);
+
+    CgiInfo info;
+    info.readFd = outPipe[0];
+    info.pid = pid;
+    info.start = std::time(NULL);
+
+    return info;
+}*/
 
 CgiInfo CgiHandler::startCgi(const Request& req, const std::string& scriptPath)
 {
-	int inPipe[2];
-	int outPipe[2];
+    std::cout << "🚨 TAMANHO DO BODY RECEBIDO ANTES DO CGI: " << req.getBody().length() << std::endl;
+    int outPipe[2];
+    if (pipe(outPipe) < 0)
+        throw std::runtime_error("cgi: pipe failed");
 
-	if (pipe(inPipe) < 0)
-		throw std::runtime_error("cgi: pipe failed");
-	if (pipe(outPipe) < 0)
-	{
-		close(inPipe[0]);
-		close(inPipe[1]);
-		throw std::runtime_error("cgi: pipe failed");
-	}
+    // =========================================================================
+    // 1. CRIANDO O ARQUIVO TEMPORÁRIO ÚNICO PARA CADA REQUISIÇÃO (Anti-Colisão)
+    // =========================================================================
+    static int cgi_file_counter = 0;
+    std::ostringstream ss;
+    ss << "/tmp/webserv_cgi_body_" << cgi_file_counter++ << ".tmp";
+    std::string tmp_name = ss.str();
 
-	const pid_t pid = fork();
-	if (pid < 0)
-	{
-		close(inPipe[0]);
-		close(inPipe[1]);
-		close(outPipe[0]);
-		close(outPipe[1]);
-		throw std::runtime_error("cgi: fork failed");
-	}
+    int tmpFd = open(tmp_name.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
+    if (tmpFd < 0)
+        throw std::runtime_error("cgi: tmp file failed");
 
-	if (pid == 0)
-	{
-		if (dup2(inPipe[0], STDIN_FILENO) < 0 || dup2(outPipe[1], STDOUT_FILENO) < 0)
-			_exit(1);
+    // Removemos o nome do arquivo da pasta /tmp IMEDIATAMENTE.
+    // O arquivo continuará existindo invisível no HD até que todos os FDs 
+    // (pai e filho) o fechem. Isso garante isolamento total e disco sempre limpo.
+    std::remove(tmp_name.c_str());
+    // =========================================================================
 
-		// The env must be built before chdir(): it carries the path as the
-		// server sees it, not as the script directory sees it.
-		std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
-		std::vector<char*> envp;
-		for (size_t i = 0; i < envStr.size(); ++i)
-			envp.push_back(const_cast<char*>(envStr[i].c_str()));
-		envp.push_back(NULL);
+    // Escrevemos os 100MB no disco de uma vez (o SO lida com isso perfeitamente)
+    if (req.getMethod() == "POST" && !req.getBody().empty()) {
+        write(tmpFd, req.getBody().c_str(), req.getBody().length());
+        lseek(tmpFd, 0, SEEK_SET); // Volta o "cursor" para o início do arquivo
+    }
 
-		// Drop every descriptor inherited from the server: listening sockets,
-		// other clients and, above all, the pipes of other running CGIs. Keeping
-		// another script's stdin write end open would stop it from ever seeing EOF.
-		for (int fd = 3; fd < 1024; ++fd)
-			close(fd);
+    const pid_t pid = fork();
+    if (pid < 0) {
+        close(tmpFd);
+        close(outPipe[0]);
+        close(outPipe[1]);
+        throw std::runtime_error("cgi: fork failed");
+    }
 
-		// Run from the script directory so relative paths inside it resolve.
-		std::string scriptName = scriptPath;
-		const std::string::size_type slash = scriptPath.find_last_of('/');
-		if (slash != std::string::npos)
-		{
-			const std::string dir = scriptPath.substr(0, slash);
-			if (chdir(dir.c_str()) < 0)
-				_exit(1);
-			scriptName = "./" + scriptPath.substr(slash + 1);
-		}
+    if (pid == 0) // PROCESSO FILHO
+    {
+        // Conecta a entrada padrão (STDIN) ao nosso arquivo temporário único
+        dup2(tmpFd, STDIN_FILENO); 
+        close(tmpFd);
 
-		const std::string interpreter = _interpreterFor(scriptPath);
-		char *argv[3];
+        // Conecta a saída (STDOUT) ao tubo de envio
+        dup2(outPipe[1], STDOUT_FILENO);
+        close(outPipe[0]);
+        close(outPipe[1]);
 
-		if (!interpreter.empty())
-		{
-			argv[0] = const_cast<char*>(interpreter.c_str());
-			argv[1] = const_cast<char*>(scriptName.c_str());
-			argv[2] = NULL;
-		}
-		else
-		{
-			argv[0] = const_cast<char*>(scriptName.c_str());
-			argv[1] = NULL;
-			argv[2] = NULL;
-		}
+        const std::string interpreter = _interpreterFor(scriptPath);
+        char *argv[3];
+        if (!interpreter.empty()) {
+            argv[0] = const_cast<char*>(interpreter.c_str());
+            argv[1] = const_cast<char*>(scriptPath.c_str());
+            argv[2] = NULL;
+        } else {
+            argv[0] = const_cast<char*>(scriptPath.c_str());
+            argv[1] = NULL;
+            argv[2] = NULL;
+        }
 
-		const char* execPath = interpreter.empty() ? scriptName.c_str() : interpreter.c_str();
-		execve(execPath, argv, &envp[0]);
-		_exit(1);
-	}
+        std::vector<std::string> envStr = _buildEnvp(req, scriptPath);
+        std::vector<char*> envp;
+        for (size_t i = 0; i < envStr.size(); ++i)
+            envp.push_back(const_cast<char*>(envStr[i].c_str()));
+        envp.push_back(NULL);
 
-	close(inPipe[0]);
-	close(outPipe[1]);
+        const char* execPath = interpreter.empty() ? scriptPath.c_str() : interpreter.c_str();
+        execve(execPath, argv, &envp[0]);
+        
+        perror("ERRO NO EXECVE DO CGI");
+        _exit(1);
+    }
 
-	int flags = fcntl(outPipe[0], F_GETFL, 0);
-	if (flags >= 0)
-		fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK);
+    // PROCESSO PAI (SEU SERVIDOR)
+    close(tmpFd);      // Fecha o arquivo no pai (ele só ficará vivo agora no filho!)
+    close(outPipe[1]); // Fecha a escrita do tubo de saída
 
-	CgiInfo info;
-	info.readFd = outPipe[0];
-	info.pid = pid;
-	info.start = std::time(NULL);
+    int flags = fcntl(outPipe[0], F_GETFL, 0);
+    if (flags >= 0)
+        fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK);
 
-	// The body is fed to the script by the main poll() loop. Writing it here
-	// would block the whole server as soon as it outgrows the pipe buffer.
-	if (req.getMethod() == "POST" && !req.getBody().empty())
-	{
-		flags = fcntl(inPipe[1], F_GETFL, 0);
-		if (flags >= 0)
-			fcntl(inPipe[1], F_SETFL, flags | O_NONBLOCK);
-		info.writeFd = inPipe[1];
-	}
-	else
-		close(inPipe[1]); // nothing to send: let the script see EOF right away
+    CgiInfo info;
+    info.readFd = outPipe[0];
+    info.pid = pid;
+    info.start = std::time(NULL);
 
-	return info;
+    return info;
 }
 

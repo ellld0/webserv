@@ -31,3 +31,25 @@ curl -i "http://localhost:9080/cgi-bin/error_script.py"
 
 ### Infinity Loop
 curl -i "http://localhost:9080/cgi-bin/infinity_loop.py"
+
+## Siege Test
+siege -b -c 100 -t 30S http://localhost:9080
+
+
+## Tester
+
+### Create requested directorys
+`bash from source
+
+mkdir YoupiBanane \
+&& touch YoupiBanane/youpi.bad_extension \
+&& touch YoupiBanane/youpi.bla \
+&& mkdir YoupiBanane/nop \
+&& touch YoupiBanane/nop/youpi.bad_extension \
+&& touch YoupiBanane/nop/other.pouic \
+&& mkdir YoupiBanane/Yeah \
+&& touch YoupiBanane/Yeah/not_happy.bad_extension
+
+
+### Copy cgi_tester to Root
+chmod +x cgi_tester

@@ -76,16 +76,16 @@ LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& token
 {
 	if (i + 2 >= tokens.size() || tokens[i] != "location" || tokens[i + 2] != "{")
 		throw std::runtime_error("Error: invalid syntax in 'location' block header.");
-    if (tokens[i + 1].empty() || tokens[i + 1][0] != '/')
+    if (tokens[i + 1].empty() || (tokens[i + 1][0] != '/' && tokens[i + 1][0] != '*' && tokens[i + 1][0] != '.') )
     {
-        throw std::runtime_error("Error: location path must start with '/'.");
+        throw std::runtime_error("Error: location path must start with '/' , '*', ',' .");
     }
 	LocationConfig location;
 	location.setPath(tokens[i + 1]);
 	i += 3;
 	bool blockClose = false;
 	bool hasRoot = false, hasMethod = false, hasDirListing = false;
-	bool hasIndex = false, hasUpload = false, hasReturn = false;
+	bool hasIndex = false, hasUpload = false, hasReturn = false, hasMaxBodySize = false, hasCgiPass = false;
 	while (i < tokens.size())
 	{
 		const std::string& token = tokens[i];
@@ -102,6 +102,10 @@ LocationConfig ConfigParser::parseLocation(const std::vector<std::string>& token
 			parseIndexDirective(location, tokens, i, hasIndex);
 		else if (token == "upload")
 			parseUploadDirective(location, tokens, i, hasUpload);
+		else if (token == "client_max_body_size")
+			parseClientMaxBodySize(location, tokens, i, hasMaxBodySize);
+		else if (token == "cgi_pass")
+			parseCgiPass(location, tokens, i, hasCgiPass);
 		else if (token == "}")
 		{
 			blockClose = true;

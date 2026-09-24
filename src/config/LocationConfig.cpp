@@ -124,3 +124,24 @@ const std::string& LocationConfig::getUploadPath() const
 {
     return uploadPath_;
 }
+
+void LocationConfig::setClientMaxBodySize(const std::string& client_max_body_size)
+{
+    _client_max_body_size = client_max_body_size;
+	//criar parse para lidar com letras definindo tamanhos
+}
+
+const std::string& LocationConfig::getClientMaxBodySize() const
+{
+    return _client_max_body_size;
+}
+
+void LocationConfig::setCgiPass(const std::string& cgi_pass)
+{
+    _cgi_pass = cgi_pass;
+}
+
+const std::string& LocationConfig::getCgiPass() const
+{
+    return _cgi_pass;
+}
